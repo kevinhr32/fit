@@ -1,5 +1,7 @@
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
 from django.db import models
+from django.db.models.signals import post_save
+from django.dispatch import receiver
 
 
 class Role(models.TextChoices):
@@ -46,3 +48,14 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     def __str__(self):
         return self.email
+
+
+@receiver(post_save, sender=User)
+def create_gimnasio_for_admin(sender, instance, created, **kwargs):
+    """Crear Gimnasio automáticamente cuando un usuario es ADMIN (creado o role cambiado)."""
+    if instance.role == 'ADMIN':
+        from gimnasio.models import Gimnasio
+        Gimnasio.objects.get_or_create(
+            owner=instance,
+            defaults={'nombre': f'Gimnasio de {instance.email}'}
+        )

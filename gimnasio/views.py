@@ -21,7 +21,6 @@ def _get_user_gimnasio(request):
 def dashboard(request):
     gimnasio = _get_user_gimnasio(request)
     if not gimnasio:
-        messages.error(request, 'No tienes un gimnasio asignado.')
         return render(request, 'gimnasio/dashboard.html', {
             'clientes': [],
             'total_vencidos': 0,
