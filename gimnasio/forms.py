@@ -2,7 +2,7 @@ from datetime import timedelta
 
 from django import forms
 
-from .models import Cliente
+from .models import Cliente, Pago
 
 
 class ClienteForm(forms.ModelForm):
@@ -34,3 +34,21 @@ class ClienteForm(forms.ModelForm):
         if commit:
             cliente.save()
         return cliente
+
+
+class PagoForm(forms.ModelForm):
+    class Meta:
+        model = Pago
+        fields = ['monto', 'metodo_pago', 'notas']
+        widgets = {
+            'monto': forms.NumberInput(attrs={'step': '0.01', 'min': '0.01', 'class': 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500'}),
+            'metodo_pago': forms.Select(attrs={'class': 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500'}),
+            'notas': forms.Textarea(attrs={'rows': 3, 'class': 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500'}),
+        }
+
+
+class EntrenadorForm(forms.Form):
+    first_name = forms.CharField(max_length=150, label='Nombre')
+    last_name = forms.CharField(max_length=150, label='Apellido')
+    email = forms.EmailField(label='Email')
+    password = forms.CharField(widget=forms.PasswordInput, label='Contraseña temporal')

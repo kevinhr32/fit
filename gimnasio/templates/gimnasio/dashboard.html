@@ -48,6 +48,34 @@
             </div>
         </div>
 
+        {% if user.role == 'ADMIN' %}
+        <div class="mb-8">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-2xl font-bold text-gray-800">Mis Entrenadores</h2>
+                <a href="{% url 'agregar_entrenador' %}" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded transition">
+                    + Agregar Entrenador
+                </a>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {% for entrenador in entrenadores %}
+                <div class="bg-white rounded-lg shadow-md p-4 border-l-4 border-blue-500">
+                    <h3 class="font-semibold text-gray-800">{{ entrenador.get_full_name|default:entrenador.email }}</h3>
+                    <p class="text-sm text-gray-500 mt-1">{{ entrenador.email }}</p>
+                    <form method="post" action="{% url 'eliminar_entrenador' entrenador.id %}" class="mt-3">
+                        {% csrf_token %}
+                        <button type="submit" onclick="return confirm('¿Desasignar a {{ entrenador.get_full_name|default:entrenador.email }} del gimnasio?')" 
+                                class="w-full bg-red-500 hover:bg-red-600 text-white py-2 px-4 rounded transition">
+                            Desasignar
+                        </button>
+                    </form>
+                </div>
+                {% empty %}
+                <p class="col-span-full text-center text-gray-500 py-8">No hay entrenadores asignados.</p>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {% for cliente in clientes %}
             <div class="rounded-lg shadow-md p-6 border-l-4 {% if cliente.estado == 'VENCIDO' %}bg-red-50 border-red-500{% elif cliente.estado == 'POR_VENCER' %}bg-yellow-50 border-yellow-400{% else %}bg-green-50 border-green-500{% endif %}">
@@ -74,6 +102,17 @@
                     </button>
                 </form>
                 <div class="flex gap-2 mt-4">
+                    {% if user.role == 'ADMIN' %}
+                    <a href="{% url 'registrar_pago' cliente.id %}" 
+                       class="flex-1 bg-green-600 hover:bg-green-700 text-white text-center py-2 px-4 rounded transition">
+                        Pagar
+                    </a>
+                    {% endif %}
+                    <a href="{% url 'historial_pagos' cliente.id %}" 
+                       class="flex-1 bg-purple-600 hover:bg-purple-700 text-white text-center py-2 px-4 rounded transition">
+                        Historial
+                    </a>
+                    {% if user.role == 'ADMIN' %}
                     <a href="{% url 'editar_cliente' cliente.id %}" 
                        class="flex-1 bg-yellow-500 hover:bg-yellow-600 text-white text-center py-2 px-4 rounded transition">
                         Editar
@@ -82,6 +121,7 @@
                             class="flex-1 bg-red-500 hover:bg-red-600 text-white py-2 px-4 rounded transition">
                         Eliminar
                     </button>
+                    {% endif %}
                 </div>
             </div>
             {% empty %}
