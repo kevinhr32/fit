@@ -1,6 +1,21 @@
 from datetime import date, timedelta
 
+from django.conf import settings
 from django.db import models
+
+
+class Gimnasio(models.Model):
+    nombre = models.CharField(max_length=150)
+    owner = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='gimnasio_admin',
+        limit_choices_to={'role': 'ADMIN'}
+    )
+    creado_en = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.nombre
 
 
 class Cliente(models.Model):
@@ -10,6 +25,13 @@ class Cliente(models.Model):
     fecha_inicio = models.DateField()
     fecha_vencimiento = models.DateField()
     activo = models.BooleanField(default=True)
+    gimnasio = models.ForeignKey(
+        Gimnasio,
+        on_delete=models.PROTECT,
+        related_name='clientes',
+        null=True,
+        blank=True
+    )
 
     @property
     def estado(self):
