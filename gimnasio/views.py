@@ -1,11 +1,13 @@
 from datetime import date, timedelta
 
 from django.contrib import messages
+from django.contrib.auth.decorators import login_required
 from django.shortcuts import get_object_or_404, redirect, render
 
 from .models import Cliente
 
 
+@login_required
 def dashboard(request):
     clientes = Cliente.objects.all()
     vencidos = sum(1 for c in clientes if c.estado == 'VENCIDO')
@@ -20,6 +22,7 @@ def dashboard(request):
     return render(request, 'gimnasio/dashboard.html', context)
 
 
+@login_required
 def renovar(request, cliente_id):
     cliente = get_object_or_404(Cliente, id=cliente_id)
     if cliente.estado == 'VENCIDO':
