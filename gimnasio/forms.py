@@ -20,6 +20,13 @@ class ClienteForm(forms.ModelForm):
             'fecha_inicio': forms.DateInput(attrs={'type': 'date'}),
         }
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.instance and self.instance.pk and self.instance.fecha_inicio and self.instance.fecha_vencimiento:
+            dias = (self.instance.fecha_vencimiento - self.instance.fecha_inicio).days
+            if dias in [30, 60, 90]:
+                self.initial['plan'] = dias
+
     def save(self, commit=True):
         cliente = super().save(commit=False)
         plan_dias = int(self.cleaned_data['plan'])

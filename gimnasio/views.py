@@ -73,3 +73,50 @@ def agregar_cliente(request):
     else:
         form = ClienteForm()
     return render(request, 'gimnasio/agregar_cliente.html', {'form': form})
+
+
+@login_required
+def editar_cliente(request, cliente_id):
+    gimnasio = _get_user_gimnasio(request)
+    if not gimnasio:
+        messages.error(request, 'No tienes un gimnasio asignado.')
+        return redirect('dashboard')
+    # Solo ADMIN puede editar
+    if request.user.role != 'ADMIN':
+        messages.error(request, 'No tienes permisos para editar clientes.')
+        return redirect('dashboard')
+    
+    cliente = get_object_or_404(Cliente, id=cliente_id, gimnasio=gimnasio)
+    
+    if request.method == 'POST':
+        form = ClienteForm(request.POST, instance=cliente)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Cliente actualizado correctamente.')
+            return redirect('dashboard')
+    else:
+        form = ClienteForm(instance=cliente)
+    
+    return render(request, 'gimnasio/editar_cliente.html', {'form': form, 'cliente': cliente})
+
+
+@login_required
+def eliminar_cliente(request, cliente_id):
+    gimnasio = _get_user_gimnasio(request)
+    if not gimnasio:
+        messages.error(request, 'No tienes un gimnasio asignado.')
+        return redirect('dashboard')
+    # Solo ADMIN puede eliminar
+    if request.user.role != 'ADMIN':
+        messages.error(request, 'No tienes permisos para eliminar clientes.')
+        return redirect('dashboard')
+    
+    cliente = get_object_or_404(Cliente, id=cliente_id, gimnasio=gimnasio)
+    
+    if request.method == 'POST':
+        nombre = f'{cliente.nombre} {cliente.apellido}'
+        cliente.delete()
+        messages.success(request, f'Cliente {nombre} eliminado correctamente.')
+        return redirect('dashboard')
+    
+    return redirect('dashboard')
