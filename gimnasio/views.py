@@ -4,6 +4,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import get_object_or_404, redirect, render
 
+from .forms import ClienteForm
 from .models import Cliente
 
 
@@ -32,3 +33,16 @@ def renovar(request, cliente_id):
     cliente.save()
     messages.success(request, f'Membresía de {cliente.nombre} {cliente.apellido} renovada por 30 días.')
     return redirect('dashboard')
+
+
+@login_required
+def agregar_cliente(request):
+    if request.method == 'POST':
+        form = ClienteForm(request.POST)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Cliente agregado correctamente.')
+            return redirect('dashboard')
+    else:
+        form = ClienteForm()
+    return render(request, 'gimnasio/agregar_cliente.html', {'form': form})
