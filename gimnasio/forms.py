@@ -2,7 +2,7 @@ from datetime import timedelta
 
 from django import forms
 
-from .models import Cliente, Pago
+from .models import Cliente, Gimnasio, Pago
 
 
 class ClienteForm(forms.ModelForm):
@@ -52,3 +52,15 @@ class EntrenadorForm(forms.Form):
     last_name = forms.CharField(max_length=150, label='Apellido')
     email = forms.EmailField(label='Email')
     password = forms.CharField(widget=forms.PasswordInput, label='Contraseña temporal')
+
+
+class GimnasioForm(forms.ModelForm):
+    class Meta:
+        model = Gimnasio
+        fields = ['nombre']
+        widgets = {
+            'nombre': forms.TextInput(attrs={
+                'class': 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500',
+                'placeholder': 'Nombre del gimnasio'
+            }),
+        }

@@ -5,7 +5,7 @@ from django.contrib.auth.decorators import login_required
 from django.db.models import Sum
 from django.shortcuts import get_object_or_404, redirect, render
 
-from .forms import ClienteForm, EntrenadorForm, PagoForm
+from .forms import ClienteForm, EntrenadorForm, GimnasioForm, PagoForm
 from .models import Cliente, Gimnasio, Pago
 from accounts.models import User
 
@@ -26,6 +26,7 @@ def dashboard(request):
         return render(request, 'gimnasio/dashboard.html', {
             'clientes': [],
             'entrenadores': [],
+            'alertas': [],
             'total_vencidos': 0,
             'total_por_vencer': 0,
             'total_activos': 0,
@@ -35,9 +36,16 @@ def dashboard(request):
     vencidos = sum(1 for c in clientes if c.estado == 'VENCIDO')
     por_vencer = sum(1 for c in clientes if c.estado == 'POR_VENCER')
     activos = sum(1 for c in clientes if c.estado == 'ACTIVO')
+    
+    # Alertas: clientes POR_VENCER y VENCIDO ordenados por fecha de vencimiento
+    alertas = [c for c in clientes if c.estado in ['VENCIDO', 'POR_VENCER']]
+    alertas.sort(key=lambda c: c.fecha_vencimiento)
+    
     context = {
         'clientes': clientes,
         'entrenadores': entrenadores,
+        'alertas': alertas,
+        'gimnasio': gimnasio,
         'total_vencidos': vencidos,
         'total_por_vencer': por_vencer,
         'total_activos': activos,
@@ -229,3 +237,32 @@ def eliminar_entrenador(request, entrenador_id):
         return redirect('dashboard')
     
     return redirect('dashboard')
+
+
+@login_required
+def configurar_gimnasio(request):
+    # Solo ADMIN y debe ser owner del gimnasio
+    if request.user.role != 'ADMIN':
+        messages.error(request, 'No tienes permisos para configurar el gimnasio.')
+        return redirect('dashboard')
+    
+    gimnasio = _get_user_gimnasio(request)
+    if not gimnasio:
+        messages.error(request, 'No tienes un gimnasio asignado.')
+        return redirect('dashboard')
+    
+    # Verificar que el usuario es el owner
+    if gimnasio.owner != request.user:
+        messages.error(request, 'No tienes permisos para configurar este gimnasio.')
+        return redirect('dashboard')
+    
+    if request.method == 'POST':
+        form = GimnasioForm(request.POST, instance=gimnasio)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Configuración del gimnasio actualizada correctamente.')
+            return redirect('dashboard')
+    else:
+        form = GimnasioForm(instance=gimnasio)
+    
+    return render(request, 'gimnasio/configurar_gimnasio.html', {'form': form, 'gimnasio': gimnasio})

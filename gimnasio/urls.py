@@ -11,4 +11,5 @@ urlpatterns = [
     path('dashboard/pagos/<int:cliente_id>/', views.historial_pagos, name='historial_pagos'),
     path('dashboard/agregar-entrenador/', views.agregar_entrenador, name='agregar_entrenador'),
     path('dashboard/eliminar-entrenador/<int:entrenador_id>/', views.eliminar_entrenador, name='eliminar_entrenador'),
+    path('dashboard/configurar-gimnasio/', views.configurar_gimnasio, name='configurar_gimnasio'),
 ]

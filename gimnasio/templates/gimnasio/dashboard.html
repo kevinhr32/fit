@@ -14,6 +14,11 @@
                 <a href="{% url 'agregar_cliente' %}" class="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded transition">
                     Agregar Cliente
                 </a>
+                {% if user.role == 'ADMIN' %}
+                <a href="{% url 'configurar_gimnasio' %}" class="bg-gray-600 hover:bg-gray-700 text-white font-semibold py-2 px-4 rounded transition">
+                    ⚙️ Configurar Gimnasio
+                </a>
+                {% endif %}
                 <form method="post" action="{% url 'logout' %}">
                     {% csrf_token %}
                     <button type="submit" class="bg-gray-600 hover:bg-gray-700 text-white font-semibold py-2 px-4 rounded transition">
@@ -30,6 +35,41 @@
                 {{ message }}
             </div>
             {% endfor %}
+        </div>
+        {% endif %}
+
+        {% if alertas %}
+        <div class="mb-8">
+            <h2 class="text-2xl font-bold text-gray-800 mb-4">⚠️ Alertas de Vencimiento</h2>
+            <div class="space-y-3">
+                {% for cliente in alertas %}
+                <div class="bg-white rounded-lg shadow p-4 border-l-4 
+                    {% if cliente.estado == 'VENCIDO' %}border-red-500 bg-red-50
+                    {% else %}border-yellow-500 bg-yellow-50{% endif %}">
+                    <div class="flex justify-between items-start flex-wrap gap-3">
+                        <div>
+                            <p class="font-semibold text-gray-800">
+                                {{ cliente.nombre }} {{ cliente.apellido }}
+                            </p>
+                            <p class="text-sm text-gray-600 mt-1">
+                                {% if cliente.estado == 'VENCIDO' %}
+                                    <span class="text-red-600 font-medium">VENCIDO</span> el {{ cliente.fecha_vencimiento|date:"d/m/Y" }}
+                                {% else %}
+                                    <span class="text-yellow-700 font-medium">POR VENCER</span> el {{ cliente.fecha_vencimiento|date:"d/m/Y" }}
+                                {% endif %}
+                            </p>
+                        </div>
+                        {% if user.role == 'ADMIN' or user.role == 'ENTRENADOR' %}
+                        <a href="https://wa.me/57{{ cliente.telefono }}?text=Hola%20{{ cliente.nombre|urlencode }}%2C%20tu%20membres%C3%ADa%20en%20{{ gimnasio.nombre|urlencode }}%20vence%20el%20{{ cliente.fecha_vencimiento|date:"d/m/Y"|urlencode }}.%20%C2%A1Te%20esperamos%20para%20renovar%21" 
+                           target="_blank" rel="noopener"
+                           class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition whitespace-nowrap flex-shrink-0">
+                            📱 WhatsApp
+                        </a>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
         </div>
         {% endif %}
 
