@@ -1,3 +1,4 @@
+{% load gymnisfit_filters %}
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -50,7 +51,7 @@
                         {% for pago in pagos %}
                         <tr class="hover:bg-gray-50">
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ pago.fecha_pago }}</td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-green-700">${{ pago.monto }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-green-700">{{ pago.monto|pesos }}</td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                                 <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full 
                                     {% if pago.metodo_pago == 'EFECTIVO' %}bg-green-100 text-green-800
@@ -73,7 +74,7 @@
                     <tfoot class="bg-gray-50 border-t border-gray-200">
                         <tr>
                             <td class="px-6 py-3 text-left text-sm font-medium text-gray-900">Total</td>
-                            <td class="px-6 py-3 text-left text-sm font-bold text-green-700">${{ total_pagado }}</td>
+                            <td class="px-6 py-3 text-left text-sm font-bold text-green-700">{{ total_pagado|pesos }}</td>
                             <td class="px-6 py-3"></td>
                             <td class="px-6 py-3"></td>
                         </tr>

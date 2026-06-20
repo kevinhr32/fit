@@ -39,12 +39,19 @@ class ClienteForm(forms.ModelForm):
 class PagoForm(forms.ModelForm):
     class Meta:
         model = Pago
-        fields = ['monto', 'metodo_pago', 'notas']
+        fields = ['monto', 'metodo_pago', 'referencia', 'notas']
         widgets = {
             'monto': forms.NumberInput(attrs={'step': '0.01', 'min': '0.01', 'class': 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500'}),
             'metodo_pago': forms.Select(attrs={'class': 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500'}),
+            'referencia': forms.TextInput(attrs={'class': 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500', 'placeholder': 'Ref. comprobante (opcional)'}),
             'notas': forms.Textarea(attrs={'rows': 3, 'class': 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500'}),
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['metodo_pago'].choices = [
+            c for c in self.fields['metodo_pago'].choices if c[0] != 'TARJETA'
+        ]
 
 
 class EntrenadorForm(forms.Form):

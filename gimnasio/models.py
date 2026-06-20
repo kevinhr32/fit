@@ -3,6 +3,8 @@ from datetime import date, timedelta
 from django.conf import settings
 from django.db import models
 
+from .utils import formatear_pesos
+
 
 class Gimnasio(models.Model):
     nombre = models.CharField(max_length=150)
@@ -50,7 +52,9 @@ class Pago(models.Model):
     METODO_CHOICES = [
         ('EFECTIVO', 'Efectivo'),
         ('TRANSFERENCIA', 'Transferencia'),
-        ('TARJETA', 'Tarjeta'),
+        ('TARJETA', 'Tarjeta (Legacy)'),
+        ('NEQUI_DAVIPLATA', 'Nequi / Daviplata'),
+        ('BREB', 'BRE-B'),
     ]
 
     cliente = models.ForeignKey(
@@ -61,10 +65,11 @@ class Pago(models.Model):
     monto = models.DecimalField(max_digits=10, decimal_places=2)
     fecha_pago = models.DateField(auto_now_add=True)
     metodo_pago = models.CharField(max_length=20, choices=METODO_CHOICES)
+    referencia = models.CharField(max_length=100, blank=True, default='', help_text='Número de comprobante/referencia de la transacción')
     notas = models.TextField(blank=True)
 
     class Meta:
         ordering = ['-fecha_pago']
 
     def __str__(self):
-        return f'{self.cliente} - ${self.monto} - {self.fecha_pago}'
+        return f'{self.cliente} - {formatear_pesos(self.monto)} - {self.fecha_pago}'
