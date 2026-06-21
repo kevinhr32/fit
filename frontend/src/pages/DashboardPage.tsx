@@ -99,6 +99,7 @@ export default function DashboardPage() {
               <ClienteCard
                 key={cliente.id}
                 cliente={cliente}
+                gymName={data.gimnasio.nombre}
                 onRenovar={handleRenovar}
               />
             ))}

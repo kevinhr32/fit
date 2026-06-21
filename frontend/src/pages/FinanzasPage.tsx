@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Download } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Download } from 'lucide-react';
 import {
   Bar,
   BarChart,
@@ -13,7 +13,7 @@ import {
   YAxis,
 } from 'recharts';
 import api from '../api/client';
-import type { FinanzasData, Pago } from '../types';
+import type { FinanzasData, Pago, PaginatedResponse } from '../types';
 
 function formatApiError(err: any): string {
   if (err?.response?.data) {
@@ -72,6 +72,8 @@ const METODO_LABELS: Record<string, string> = {
   BREB: 'BRE-B',
 };
 
+const PAGE_SIZE = 15;
+
 function getRangoAnios(anioActual: number) {
   return Array.from({ length: 5 }, (_, i) => anioActual - i);
 }
@@ -83,6 +85,13 @@ export default function FinanzasPage() {
   const [mes, setMes] = useState<number>(new Date().getMonth() + 1);
   const [anio, setAnio] = useState<number>(new Date().getFullYear());
   const [exportando, setExportando] = useState(false);
+
+  const [vistaPagos, setVistaPagos] = useState<'ultimos' | 'todos'>('ultimos');
+  const [todosPagos, setTodosPagos] = useState<Pago[]>([]);
+  const [paginaActual, setPaginaActual] = useState(1);
+  const [totalPaginas, setTotalPaginas] = useState(1);
+  const [cargandoTodos, setCargandoTodos] = useState(false);
+  const [errorTodos, setErrorTodos] = useState('');
 
   const fetchFinanzas = async () => {
     setLoading(true);
@@ -99,9 +108,32 @@ export default function FinanzasPage() {
     }
   };
 
+  const fetchTodosPagos = async (page: number) => {
+    setCargandoTodos(true);
+    setErrorTodos('');
+    try {
+      const response = await api.get<PaginatedResponse<Pago>>('pagos/', {
+        params: { page, page_size: PAGE_SIZE },
+      });
+      setTodosPagos(response.data.results);
+      setTotalPaginas(Math.ceil(response.data.count / PAGE_SIZE));
+      setPaginaActual(page);
+    } catch (err) {
+      setErrorTodos(formatApiError(err));
+    } finally {
+      setCargandoTodos(false);
+    }
+  };
+
   useEffect(() => {
     fetchFinanzas();
   }, []);
+
+  useEffect(() => {
+    if (vistaPagos === 'todos') {
+      fetchTodosPagos(1);
+    }
+  }, [vistaPagos]);
 
   const aniosDisponibles = useMemo(() => {
     return data?.rango_anios || getRangoAnios(new Date().getFullYear());
@@ -139,6 +171,8 @@ export default function FinanzasPage() {
       setExportando(false);
     }
   };
+
+  const pagosAMostrar: Pago[] = vistaPagos === 'ultimos' ? data?.ultimos_pagos || [] : todosPagos;
 
   if (loading) {
     return (
@@ -363,14 +397,45 @@ export default function FinanzasPage() {
           </div>
 
           <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
-            <div className="p-6 pb-4">
+            <div className="p-6 pb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <h2
                 className="text-lg text-navy uppercase tracking-tight"
                 style={{ fontFamily: "'Archivo Black', sans-serif" }}
               >
-                Últimos pagos
+                Pagos
               </h2>
+              <div className="flex items-center gap-1 bg-bone rounded-lg p-1">
+                <button
+                  onClick={() => setVistaPagos('ultimos')}
+                  className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                    vistaPagos === 'ultimos'
+                      ? 'bg-white text-navy shadow-sm'
+                      : 'text-slate hover:text-navy'
+                  }`}
+                >
+                  Últimos pagos
+                </button>
+                <button
+                  onClick={() => setVistaPagos('todos')}
+                  className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                    vistaPagos === 'todos'
+                      ? 'bg-white text-navy shadow-sm'
+                      : 'text-slate hover:text-navy'
+                  }`}
+                >
+                  Todos los pagos
+                </button>
+              </div>
             </div>
+
+            {errorTodos && (
+              <div className="px-6 pb-4">
+                <div className="p-3 rounded-lg bg-danger/10 text-danger text-sm">
+                  {errorTodos}
+                </div>
+              </div>
+            )}
+
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
                 <thead>
@@ -383,26 +448,65 @@ export default function FinanzasPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate/10">
-                  {data.ultimos_pagos.map((pago: Pago) => (
-                    <tr key={pago.id} className="hover:bg-bone/50 transition-colors">
-                      <td className="px-5 py-4 text-sm font-medium text-navy">{pago.cliente_nombre}</td>
-                      <td className="px-5 py-4 text-sm font-semibold text-success">{formatearPesos(pago.monto)}</td>
-                      <td className="px-5 py-4 text-slate text-sm">{formatearFecha(pago.fecha_pago)}</td>
-                      <td className="px-5 py-4">
-                        <span
-                          className={`text-xs font-medium px-2.5 py-1 rounded-full border ${
-                            METODO_BADGES[pago.metodo_pago] || 'bg-slate/10 text-slate border-slate/20'
-                          }`}
-                        >
-                          {METODO_LABELS[pago.metodo_pago] || pago.metodo_pago}
-                        </span>
+                  {cargandoTodos ? (
+                    <tr>
+                      <td colSpan={5} className="px-5 py-12 text-center text-slate">
+                        Cargando pagos...
                       </td>
-                      <td className="px-5 py-4 text-slate text-sm">{pago.referencia || '—'}</td>
                     </tr>
-                  ))}
+                  ) : pagosAMostrar.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="px-5 py-12 text-center text-slate">
+                        No hay pagos para mostrar.
+                      </td>
+                    </tr>
+                  ) : (
+                    pagosAMostrar.map((pago: Pago) => (
+                      <tr key={pago.id} className="hover:bg-bone/50 transition-colors">
+                        <td className="px-5 py-4 text-sm font-medium text-navy">{pago.cliente_nombre}</td>
+                        <td className="px-5 py-4 text-sm font-semibold text-success">{formatearPesos(pago.monto)}</td>
+                        <td className="px-5 py-4 text-slate text-sm">{formatearFecha(pago.fecha_pago)}</td>
+                        <td className="px-5 py-4">
+                          <span
+                            className={`text-xs font-medium px-2.5 py-1 rounded-full border ${
+                              METODO_BADGES[pago.metodo_pago] || 'bg-slate/10 text-slate border-slate/20'
+                            }`}
+                          >
+                            {METODO_LABELS[pago.metodo_pago] || pago.metodo_pago}
+                          </span>
+                        </td>
+                        <td className="px-5 py-4 text-slate text-sm">{pago.referencia || '—'}</td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
+
+            {vistaPagos === 'todos' && totalPaginas > 1 && (
+              <div className="flex items-center justify-between px-6 py-4 border-t border-slate/10">
+                <button
+                  onClick={() => fetchTodosPagos(paginaActual - 1)}
+                  disabled={paginaActual <= 1 || cargandoTodos}
+                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate/30 text-navy text-sm font-medium hover:bg-slate/5 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  <ChevronLeft size={16} />
+                  Anterior
+                </button>
+                <span className="text-sm text-slate">
+                  Página <span className="font-medium text-navy">{paginaActual}</span> de{' '}
+                  <span className="font-medium text-navy">{totalPaginas}</span>
+                </span>
+                <button
+                  onClick={() => fetchTodosPagos(paginaActual + 1)}
+                  disabled={paginaActual >= totalPaginas || cargandoTodos}
+                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate/30 text-navy text-sm font-medium hover:bg-slate/5 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  Siguiente
+                  <ChevronRight size={16} />
+                </button>
+              </div>
+            )}
           </div>
         </>
       )}

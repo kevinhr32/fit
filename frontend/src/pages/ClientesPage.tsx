@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Plus, Pencil, Trash2, RefreshCw } from 'lucide-react';
+import { Plus, Pencil, Trash2, RefreshCw, Wallet, MessageCircle } from 'lucide-react';
 import api from '../api/client';
 import type { Cliente } from '../types';
 import ClienteFormModal from '../components/ClienteFormModal';
 import ConfirmModal from '../components/ConfirmModal';
+import PagoFormModal from '../components/PagoFormModal';
+import { buildWhatsAppUrl, formatearFechaCorta } from '../utils/whatsapp';
 
 const estadoConfig = {
   VENCIDO: {
@@ -28,14 +30,38 @@ function formatearFecha(fecha: string) {
   });
 }
 
+function formatApiError(err: any): string {
+  if (err?.response?.data) {
+    const data = err.response.data;
+    if (typeof data === 'string') return data;
+    if (data.detail && typeof data.detail === 'string') return data.detail;
+
+    const messages: string[] = [];
+    for (const [field, errors] of Object.entries(data)) {
+      if (Array.isArray(errors)) {
+        messages.push(`${field}: ${errors.join(', ')}`);
+      } else if (typeof errors === 'string') {
+        messages.push(`${field}: ${errors}`);
+      }
+    }
+    if (messages.length > 0) return messages.join('; ');
+  }
+  return 'No se pudo cargar la lista de clientes.';
+}
+
 export default function ClientesPage() {
   const [clientes, setClientes] = useState<Cliente[]>([]);
+  const [gymName, setGymName] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+  const [success, setSuccess] = useState('');
 
   const [clienteForm, setClienteForm] = useState<Cliente | null | undefined>(undefined);
   const isFormOpen = clienteForm !== undefined;
+
+  const [clientePago, setClientePago] = useState<Cliente | null>(null);
+  const isPagoOpen = clientePago !== null;
 
   const [clienteAEliminar, setClienteAEliminar] = useState<Cliente | null>(null);
   const [eliminando, setEliminando] = useState(false);
@@ -45,10 +71,14 @@ export default function ClientesPage() {
     setLoading(true);
     setError('');
     try {
-      const response = await api.get<Cliente[]>('clientes/');
-      setClientes(response.data);
+      const [clientesRes, gymRes] = await Promise.all([
+        api.get<Cliente[]>('clientes/'),
+        api.get<{ nombre: string }>('gimnasio/'),
+      ]);
+      setClientes(clientesRes.data);
+      setGymName(gymRes.data.nombre);
     } catch (err) {
-      setError('No se pudo cargar la lista de clientes.');
+      setError(formatApiError(err));
     } finally {
       setLoading(false);
     }
@@ -57,6 +87,12 @@ export default function ClientesPage() {
   useEffect(() => {
     fetchClientes();
   }, []);
+
+  useEffect(() => {
+    if (!success) return;
+    const timer = setTimeout(() => setSuccess(''), 3000);
+    return () => clearTimeout(timer);
+  }, [success]);
 
   const filteredClientes = useMemo(() => {
     const term = searchTerm.toLowerCase().trim();
@@ -106,6 +142,10 @@ export default function ClientesPage() {
     }
   };
 
+  const handlePagoSaved = () => {
+    setSuccess('Pago registrado correctamente.');
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-96">
@@ -136,6 +176,12 @@ export default function ClientesPage() {
       >
         Clientes
       </h1>
+
+      {success && (
+        <div className="mb-5 p-3 rounded-lg bg-success/10 text-success text-sm">
+          {success}
+        </div>
+      )}
 
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
         <div className="relative w-full md:w-80">
@@ -180,6 +226,16 @@ export default function ClientesPage() {
               <tbody className="divide-y divide-slate/10">
                 {filteredClientes.map((cliente) => {
                   const config = estadoConfig[cliente.estado];
+                  const whatsappUrl =
+                    cliente.telefono && gymName && (cliente.estado === 'VENCIDO' || cliente.estado === 'POR_VENCER')
+                      ? buildWhatsAppUrl(
+                          cliente.telefono,
+                          `${cliente.nombre} ${cliente.apellido}`,
+                          gymName,
+                          formatearFechaCorta(cliente.fecha_vencimiento)
+                        )
+                      : null;
+
                   return (
                     <tr key={cliente.id} className="hover:bg-bone/50 transition-colors">
                       <td className="px-5 py-4">
@@ -205,6 +261,27 @@ export default function ClientesPage() {
                             <RefreshCw size={14} className={renovandoId === cliente.id ? 'animate-spin' : ''} />
                             {renovandoId === cliente.id ? 'Renovando' : 'Renovar 30 días'}
                           </button>
+
+                          <button
+                            onClick={() => setClientePago(cliente)}
+                            className="inline-flex items-center gap-1.5 bg-success/10 hover:bg-success/20 text-success text-xs font-medium px-3 py-1.5 rounded-lg transition-colors"
+                          >
+                            <Wallet size={14} />
+                            Registrar pago
+                          </button>
+
+                          {whatsappUrl && (
+                            <a
+                              href={whatsappUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center justify-center bg-green-500 hover:bg-green-600 text-white p-1.5 rounded-lg transition-colors"
+                              title="Enviar recordatorio por WhatsApp"
+                            >
+                              <MessageCircle size={18} />
+                            </a>
+                          )}
+
                           <button
                             onClick={() => setClienteForm(cliente)}
                             className="p-1.5 text-slate hover:text-navy hover:bg-slate/10 rounded-lg transition-colors"
@@ -212,6 +289,7 @@ export default function ClientesPage() {
                           >
                             <Pencil size={18} />
                           </button>
+
                           <button
                             onClick={() => setClienteAEliminar(cliente)}
                             className="p-1.5 text-slate hover:text-danger hover:bg-danger/10 rounded-lg transition-colors"
@@ -235,6 +313,14 @@ export default function ClientesPage() {
         isOpen={isFormOpen}
         onClose={() => setClienteForm(undefined)}
         onSaved={handleSaved}
+      />
+
+      <PagoFormModal
+        clienteId={clientePago?.id || null}
+        clienteNombre={clientePago ? `${clientePago.nombre} ${clientePago.apellido}` : ''}
+        isOpen={isPagoOpen}
+        onClose={() => setClientePago(null)}
+        onSaved={handlePagoSaved}
       />
 
       <ConfirmModal

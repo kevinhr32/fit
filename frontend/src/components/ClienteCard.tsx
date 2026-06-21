@@ -1,9 +1,12 @@
 import { useState } from 'react';
+import { MessageCircle } from 'lucide-react';
 import api from '../api/client';
 import type { Cliente } from '../types';
+import { buildWhatsAppUrl, formatearFechaCorta } from '../utils/whatsapp';
 
 interface ClienteCardProps {
   cliente: Cliente;
+  gymName: string;
   onRenovar: (cliente: Cliente) => void;
 }
 
@@ -33,7 +36,7 @@ function formatearFecha(fecha: string) {
   });
 }
 
-export default function ClienteCard({ cliente, onRenovar }: ClienteCardProps) {
+export default function ClienteCard({ cliente, gymName, onRenovar }: ClienteCardProps) {
   const [loading, setLoading] = useState(false);
   const config = estadoConfig[cliente.estado];
 
@@ -50,6 +53,15 @@ export default function ClienteCard({ cliente, onRenovar }: ClienteCardProps) {
       setLoading(false);
     }
   };
+
+  const whatsappUrl = cliente.telefono
+    ? buildWhatsAppUrl(
+        cliente.telefono,
+        `${cliente.nombre} ${cliente.apellido}`,
+        gymName,
+        formatearFechaCorta(cliente.fecha_vencimiento)
+      )
+    : null;
 
   return (
     <div
@@ -74,13 +86,27 @@ export default function ClienteCard({ cliente, onRenovar }: ClienteCardProps) {
         )}
       </div>
 
-      <button
-        onClick={handleRenovar}
-        disabled={loading}
-        className="self-start sm:self-center inline-flex items-center justify-center bg-accent hover:bg-accent-light disabled:bg-accent-light/70 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
-      >
-        {loading ? 'Renovando...' : 'Renovar'}
-      </button>
+      <div className="flex items-center gap-2 self-start sm:self-center">
+        <button
+          onClick={handleRenovar}
+          disabled={loading}
+          className="inline-flex items-center justify-center bg-accent hover:bg-accent-light disabled:bg-accent-light/70 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+        >
+          {loading ? 'Renovando...' : 'Renovar'}
+        </button>
+
+        {whatsappUrl && (
+          <a
+            href={whatsappUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center justify-center bg-green-500 hover:bg-green-600 text-white p-2 rounded-lg transition-colors"
+            title="Enviar recordatorio por WhatsApp"
+          >
+            <MessageCircle size={18} />
+          </a>
+        )}
+      </div>
     </div>
   );
 }

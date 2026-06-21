@@ -8,6 +8,7 @@ from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib.units import inch
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 from rest_framework import mixins, status, viewsets
+from rest_framework.pagination import PageNumberPagination
 from rest_framework.decorators import action
 from rest_framework.exceptions import NotFound, PermissionDenied
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -153,6 +154,12 @@ class ClienteViewSet(viewsets.ModelViewSet):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
+class PagoPagination(PageNumberPagination):
+    page_size = 15
+    page_size_query_param = 'page_size'
+    max_page_size = 100
+
+
 class PagoViewSet(
     mixins.CreateModelMixin,
     mixins.ListModelMixin,
@@ -161,6 +168,7 @@ class PagoViewSet(
 ):
     """Crear y listar pagos del gimnasio."""
     serializer_class = PagoSerializer
+    pagination_class = PagoPagination
 
     def get_permissions(self):
         if self.action in ('list', 'retrieve'):
