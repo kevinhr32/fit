@@ -316,7 +316,7 @@ def finanzas(request):
         'EFECTIVO': '#10B981',
         'TRANSFERENCIA': '#3B82F6',
         'TARJETA': '#8B5CF6',
-        'NEQUI_DAVIPLATA': '#14B8A6',
+        'NEQUI_DAVIPLATA': '#EC4899',
         'BREB': '#F97316',
     }
     metodos_data = []

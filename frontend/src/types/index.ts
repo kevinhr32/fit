@@ -62,3 +62,41 @@ export interface NuevoEntrenadorPayload {
   last_name: string;
   password: string;
 }
+
+export interface IngresoMensual {
+  mes: string;
+  total: number;
+}
+
+export interface MetodoPagoData {
+  metodo: string;
+  metodo_display: string;
+  total: number;
+  porcentaje: number;
+  color: string;
+  offset: number;
+}
+
+export interface Pago {
+  id: number;
+  cliente: number;
+  cliente_nombre: string;
+  monto: string;
+  fecha_pago: string;
+  metodo_pago: string;
+  referencia: string;
+  notas: string;
+}
+
+export interface FinanzasData {
+  gimnasio: Gimnasio;
+  total_mes: number;
+  total_historico: number;
+  ingresos_mensuales: IngresoMensual[];
+  metodos_data: MetodoPagoData[];
+  ultimos_pagos: Pago[];
+  max_mensual: number;
+  anio_actual: number;
+  mes_actual: number;
+  rango_anios: number[];
+}

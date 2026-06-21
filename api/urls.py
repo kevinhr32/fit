@@ -6,6 +6,8 @@ from .views import (
     ClienteViewSet,
     DashboardAPIView,
     EntrenadorViewSet,
+    ExportarPagosPDFAPIView,
+    FinanzasAPIView,
     GimnasioViewSet,
     MyTokenObtainPairView,
     PagoViewSet,
@@ -20,6 +22,8 @@ urlpatterns = [
     path('auth/login/', MyTokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('auth/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('dashboard/', DashboardAPIView.as_view(), name='api_dashboard'),
+    path('finanzas/', FinanzasAPIView.as_view(), name='api_finanzas'),
+    path('finanzas/exportar-pdf/', ExportarPagosPDFAPIView.as_view(), name='api_exportar_pdf'),
     path('gimnasio/', GimnasioViewSet.as_view({
         'get': 'retrieve',
         'put': 'update',
