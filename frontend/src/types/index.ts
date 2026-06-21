@@ -45,3 +45,20 @@ export interface NuevoClientePayload {
   fecha_inicio: string;
   plan_dias: number;
 }
+
+export interface Entrenador {
+  id: number;
+  email: string;
+  first_name: string;
+  last_name: string;
+  role: 'ENTRENADOR';
+  gimnasio: number;
+  date_joined: string;
+}
+
+export interface NuevoEntrenadorPayload {
+  email: string;
+  first_name: string;
+  last_name: string;
+  password: string;
+}

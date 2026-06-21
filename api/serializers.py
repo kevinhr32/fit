@@ -81,8 +81,8 @@ class EntrenadorSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ['id', 'email', 'first_name', 'last_name', 'role', 'gimnasio', 'password']
-        read_only_fields = ['role', 'gimnasio']
+        fields = ['id', 'email', 'first_name', 'last_name', 'role', 'gimnasio', 'password', 'date_joined']
+        read_only_fields = ['role', 'gimnasio', 'date_joined']
 
     def create(self, validated_data):
         password = validated_data.pop('password', 'temporal123')
