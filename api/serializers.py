@@ -35,6 +35,7 @@ class GimnasioSerializer(serializers.ModelSerializer):
 class ClienteSerializer(serializers.ModelSerializer):
     estado = serializers.CharField(read_only=True)
     plan_dias = serializers.IntegerField(write_only=True, required=False)
+    fecha_vencimiento = serializers.DateField(required=False)
 
     class Meta:
         model = Cliente

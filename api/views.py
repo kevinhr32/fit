@@ -1,4 +1,7 @@
+from datetime import date, timedelta
+
 from rest_framework import mixins, status, viewsets
+from rest_framework.decorators import action
 from rest_framework.exceptions import NotFound, PermissionDenied
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
@@ -119,6 +122,27 @@ class ClienteViewSet(viewsets.ModelViewSet):
         if not gimnasio:
             raise NotFound('No tienes un gimnasio asignado.')
         serializer.save(gimnasio=gimnasio)
+
+    @action(detail=True, methods=['post'], url_path='renovar')
+    def renovar(self, request, pk=None):
+        """Renovar la membresía de un cliente extendiendo su fecha de vencimiento."""
+        cliente = self.get_object()
+        dias = request.data.get('dias', 30)
+        try:
+            dias = int(dias)
+        except (TypeError, ValueError):
+            return Response(
+                {'detail': 'El campo "dias" debe ser un número entero válido.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        base = max(cliente.fecha_vencimiento, date.today())
+        cliente.fecha_vencimiento = base + timedelta(days=dias)
+        cliente.activo = True
+        cliente.save()
+
+        serializer = self.get_serializer(cliente)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 class PagoViewSet(
