@@ -34,6 +34,13 @@ class Cliente(models.Model):
         null=True,
         blank=True
     )
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        related_name='cliente_perfil',
+        null=True,
+        blank=True
+    )
 
     @property
     def estado(self):
@@ -46,6 +53,71 @@ class Cliente(models.Model):
 
     def __str__(self):
         return f'{self.nombre} {self.apellido}'
+
+
+class Clase(models.Model):
+    ESTADO_CHOICES = [
+        ('ACTIVA', 'Activa'),
+        ('CANCELADA', 'Cancelada'),
+    ]
+
+    nombre = models.CharField(max_length=100)
+    entrenador = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='clases',
+        limit_choices_to={'role': 'ENTRENADOR'}
+    )
+    gimnasio = models.ForeignKey(
+        Gimnasio,
+        on_delete=models.CASCADE,
+        related_name='clases'
+    )
+    fecha_hora_inicio = models.DateTimeField()
+    duracion_minutos = models.PositiveIntegerField(default=60)
+    cupo_maximo = models.PositiveIntegerField(default=20)
+    descripcion = models.TextField(blank=True, default='')
+    estado = models.CharField(max_length=10, choices=ESTADO_CHOICES, default='ACTIVA')
+    creado_en = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['fecha_hora_inicio']
+
+    def __str__(self):
+        return f'{self.nombre} - {self.fecha_hora_inicio}'
+
+
+class Reserva(models.Model):
+    ESTADO_CHOICES = [
+        ('CONFIRMADA', 'Confirmada'),
+        ('CANCELADA', 'Cancelada'),
+    ]
+
+    cliente = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='reservas'
+    )
+    clase = models.ForeignKey(
+        Clase,
+        on_delete=models.CASCADE,
+        related_name='reservas'
+    )
+    fecha_reserva = models.DateTimeField(auto_now_add=True)
+    estado = models.CharField(max_length=12, choices=ESTADO_CHOICES, default='CONFIRMADA')
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['cliente', 'clase'],
+                condition=models.Q(estado='CONFIRMADA'),
+                name='unique_reserva_activa_por_clase'
+            )
+        ]
+        ordering = ['-fecha_reserva']
+
+    def __str__(self):
+        return f'{self.cliente} -> {self.clase}'
 
 
 class Pago(models.Model):

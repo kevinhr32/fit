@@ -4,12 +4,15 @@ from rest_framework_simplejwt.views import TokenRefreshView
 
 from .views import (
     ClienteViewSet,
+    ClaseViewSet,
+    CrearCredencialesClienteAPIView,
     DashboardAPIView,
     EntrenadorViewSet,
     ExportarPagosPDFAPIView,
     FinanzasAPIView,
     GimnasioViewSet,
     LogoutAPIView,
+    MiMembresiaAPIView,
     MyTokenObtainPairView,
     PagoViewSet,
 )
@@ -18,6 +21,7 @@ router = DefaultRouter()
 router.register(r'clientes', ClienteViewSet, basename='cliente')
 router.register(r'pagos', PagoViewSet, basename='pago')
 router.register(r'entrenadores', EntrenadorViewSet, basename='entrenador')
+router.register(r'clases', ClaseViewSet, basename='clase')
 
 urlpatterns = [
     path('auth/login/', MyTokenObtainPairView.as_view(), name='token_obtain_pair'),
@@ -31,4 +35,6 @@ urlpatterns = [
         'put': 'update',
         'patch': 'partial_update',
     }), name='gimnasio'),
+    path('clientes/crear-credenciales/', CrearCredencialesClienteAPIView.as_view(), name='crear_credenciales'),
+    path('mi-membresia/', MiMembresiaAPIView.as_view(), name='mi_membresia'),
 ] + router.urls

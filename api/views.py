@@ -19,26 +19,31 @@ from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.views import TokenObtainPairView
 
 from accounts.models import User
-from gimnasio.models import Cliente, Gimnasio, Pago
+from gimnasio.models import Cliente, Clase, Gimnasio, Pago, Reserva
 from gimnasio.utils import formatear_pesos
 
-from .permissions import IsAdmin, IsAdminOrEntrenador
+from .permissions import IsAdmin, IsAdminOrEntrenador, IsCliente, IsClienteActivo, IsEntrenador
 from .throttles import LoginRateThrottle
 from .serializers import (
     ClienteSerializer,
+    ClaseSerializer,
     EntrenadorSerializer,
     GimnasioSerializer,
     MyTokenObtainPairSerializer,
     PagoSerializer,
+    ReservaSerializer,
 )
 
 
 def _get_user_gimnasio(user):
-    """Obtener el gimnasio asociado al usuario (ADMIN o ENTRENADOR)."""
+    """Obtener el gimnasio asociado al usuario (ADMIN, ENTRENADOR o CLIENTE)."""
     if user.role == 'ADMIN':
         return getattr(user, 'gimnasio_admin', None)
     if user.role == 'ENTRENADOR':
         return user.gimnasio
+    if user.role == 'CLIENTE':
+        cliente = getattr(user, 'cliente_perfil', None)
+        return cliente.gimnasio if cliente else None
     return None
 
 
@@ -448,3 +453,177 @@ class ExportarPagosPDFAPIView(APIView):
 
         doc.build(elements)
         return response
+
+
+class ClaseViewSet(viewsets.ModelViewSet):
+    """CRUD de clases del gimnasio.
+
+    - ENTRENADOR crea/edita/elimina solo sus propias clases.
+    - ADMIN puede ver todas las clases pero no crear/editar.
+    - CLIENTE puede ver clases y reservar/cancelar.
+    """
+    serializer_class = ClaseSerializer
+
+    def get_permissions(self):
+        if self.action in ('list', 'retrieve'):
+            return [IsAuthenticated()]
+        if self.action == 'reservar':
+            return [IsClienteActivo()]
+        if self.action == 'cancelar_reserva':
+            return [IsCliente()]
+        if self.action == 'reservas':
+            return [IsAdminOrEntrenador()]
+        # create, update, partial_update, destroy
+        return [IsEntrenador()]
+
+    def get_queryset(self):
+        gimnasio = _get_user_gimnasio(self.request.user)
+        if not gimnasio:
+            return Clase.objects.none()
+        qs = Clase.objects.filter(gimnasio=gimnasio)
+        # Entrenador solo puede editar/eliminar sus propias clases
+        if self.request.user.role == 'ENTRENADOR' and self.action in ('update', 'partial_update', 'destroy'):
+            qs = qs.filter(entrenador=self.request.user)
+        return qs
+
+    def perform_create(self, serializer):
+        gimnasio = _get_user_gimnasio(self.request.user)
+        if not gimnasio:
+            raise NotFound('No tienes un gimnasio asignado.')
+        serializer.save(entrenador=self.request.user, gimnasio=gimnasio)
+
+    @action(detail=True, methods=['post'])
+    def reservar(self, request, pk=None):
+        """Reservar una clase (solo CLIENTE con membresía ACTIVA)."""
+        clase = self.get_object()
+
+        if clase.estado == 'CANCELADA':
+            return Response(
+                {'detail': 'Esta clase está cancelada.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        confirmadas = clase.reservas.filter(estado='CONFIRMADA').count()
+        if confirmadas >= clase.cupo_maximo:
+            return Response(
+                {'detail': 'No hay cupos disponibles para esta clase.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        ya_reservado = clase.reservas.filter(
+            cliente=request.user, estado='CONFIRMADA'
+        ).exists()
+        if ya_reservado:
+            return Response(
+                {'detail': 'Ya tienes una reserva activa para esta clase.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        reserva = Reserva.objects.create(cliente=request.user, clase=clase)
+        serializer = ReservaSerializer(reserva)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=['delete'], url_path='cancelar-reserva')
+    def cancelar_reserva(self, request, pk=None):
+        """Cancelar una reserva (solo el CLIENTE que la hizo)."""
+        clase = self.get_object()
+        try:
+            reserva = Reserva.objects.get(
+                cliente=request.user, clase=clase, estado='CONFIRMADA'
+            )
+        except Reserva.DoesNotExist:
+            return Response(
+                {'detail': 'No tienes una reserva activa para esta clase.'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        reserva.estado = 'CANCELADA'
+        reserva.save()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @action(detail=True, methods=['get'])
+    def reservas(self, request, pk=None):
+        """Ver quién reservó una clase (solo ENTRENADOR o ADMIN)."""
+        clase = self.get_object()
+        # Entrenador solo puede ver reservas de sus propias clases
+        if request.user.role == 'ENTRENADOR' and clase.entrenador_id != request.user.id:
+            raise PermissionDenied('Solo puedes ver las reservas de tus propias clases.')
+        reservas = clase.reservas.filter(estado='CONFIRMADA').order_by('-fecha_reserva')
+        serializer = ReservaSerializer(reservas, many=True)
+        return Response(serializer.data)
+
+
+class CrearCredencialesClienteAPIView(APIView):
+    """ADMIN crea credenciales (User) para un Cliente existente."""
+    permission_classes = [IsAdmin]
+
+    def post(self, request):
+        cliente_id = request.data.get('cliente_id')
+        email = request.data.get('email')
+        password = request.data.get('password')
+
+        if not cliente_id or not email or not password:
+            return Response(
+                {'detail': 'cliente_id, email y password son requeridos.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        gimnasio = _get_user_gimnasio(request.user)
+        try:
+            cliente = Cliente.objects.get(id=cliente_id, gimnasio=gimnasio)
+        except Cliente.DoesNotExist:
+            return Response(
+                {'detail': 'Cliente no encontrado en tu gimnasio.'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        if cliente.user:
+            return Response(
+                {'detail': 'Este cliente ya tiene una cuenta vinculada.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if User.objects.filter(email=email).exists():
+            return Response(
+                {'detail': 'Ya existe un usuario con este email.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        from django.contrib.auth.password_validation import validate_password
+        from django.core.exceptions import ValidationError as DjangoValidationError
+        try:
+            validate_password(password)
+        except DjangoValidationError as e:
+            return Response(
+                {'password': e.messages},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        user = User.objects.create_user(email=email, password=password, role='CLIENTE')
+        cliente.user = user
+        cliente.save()
+
+        return Response(
+            {'detail': 'Cuenta creada correctamente para el cliente.'},
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class MiMembresiaAPIView(APIView):
+    """El cliente logueado ve su propio perfil de membresía."""
+    permission_classes = [IsCliente]
+
+    def get(self, request):
+        cliente = getattr(request.user, 'cliente_perfil', None)
+        if not cliente:
+            return Response(
+                {'detail': 'No tienes perfil de cliente vinculado.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        return Response({
+            'id': cliente.id,
+            'nombre': cliente.nombre,
+            'apellido': cliente.apellido,
+            'telefono': cliente.telefono,
+            'fecha_vencimiento': cliente.fecha_vencimiento,
+            'estado': cliente.estado,
+        })
