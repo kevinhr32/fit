@@ -14,6 +14,8 @@ from rest_framework.exceptions import NotFound, PermissionDenied
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.views import TokenObtainPairView
 
 from accounts.models import User
@@ -21,6 +23,7 @@ from gimnasio.models import Cliente, Gimnasio, Pago
 from gimnasio.utils import formatear_pesos
 
 from .permissions import IsAdmin, IsAdminOrEntrenador
+from .throttles import LoginRateThrottle
 from .serializers import (
     ClienteSerializer,
     EntrenadorSerializer,
@@ -43,6 +46,29 @@ class MyTokenObtainPairView(TokenObtainPairView):
     """Login vía JWT con claims adicionales."""
     serializer_class = MyTokenObtainPairSerializer
     permission_classes = [AllowAny]
+    throttle_classes = [LoginRateThrottle]
+
+
+class LogoutAPIView(APIView):
+    """Logout: blacklista el refresh token para invalidarlo."""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        refresh_token = request.data.get('refresh')
+        if not refresh_token:
+            return Response(
+                {'detail': 'Refresh token requerido.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            token = RefreshToken(refresh_token)
+            token.blacklist()
+        except TokenError:
+            return Response(
+                {'detail': 'Token inválido o ya invalidado.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        return Response(status=status.HTTP_205_RESET_CONTENT)
 
 
 class DashboardAPIView(APIView):

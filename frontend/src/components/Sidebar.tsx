@@ -1,6 +1,7 @@
-import { LayoutDashboard, Users, Dumbbell, Wallet, Settings } from 'lucide-react';
-import { NavLink } from 'react-router-dom';
+import { LayoutDashboard, Users, Dumbbell, Wallet, Settings, LogOut } from 'lucide-react';
+import { NavLink, useNavigate } from 'react-router-dom';
 import Logo from './Logo';
+import { logout } from '../api/client';
 
 const navItems = [
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -11,6 +12,13 @@ const navItems = [
 ];
 
 export default function Sidebar() {
+  const navigate = useNavigate();
+
+  const handleLogout = async () => {
+    await logout();
+    navigate('/login', { replace: true });
+  };
+
   return (
     <aside
       className="fixed left-0 top-0 h-full bg-navy w-[168px] flex flex-col py-8 px-3 z-50"
@@ -43,6 +51,16 @@ export default function Sidebar() {
           );
         })}
       </nav>
+
+      <button
+        onClick={handleLogout}
+        className="flex flex-col items-center gap-1.5 rounded-xl px-2 py-3 text-slate hover:text-danger hover:bg-white/5 transition-colors mt-4"
+      >
+        <LogOut size={24} />
+        <span className="text-xs font-medium text-center leading-tight">
+          Cerrar sesión
+        </span>
+      </button>
     </aside>
   );
 }

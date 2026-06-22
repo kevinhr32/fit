@@ -9,6 +9,7 @@ from .views import (
     ExportarPagosPDFAPIView,
     FinanzasAPIView,
     GimnasioViewSet,
+    LogoutAPIView,
     MyTokenObtainPairView,
     PagoViewSet,
 )
@@ -21,6 +22,7 @@ router.register(r'entrenadores', EntrenadorViewSet, basename='entrenador')
 urlpatterns = [
     path('auth/login/', MyTokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('auth/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    path('auth/logout/', LogoutAPIView.as_view(), name='token_logout'),
     path('dashboard/', DashboardAPIView.as_view(), name='api_dashboard'),
     path('finanzas/', FinanzasAPIView.as_view(), name='api_finanzas'),
     path('finanzas/exportar-pdf/', ExportarPagosPDFAPIView.as_view(), name='api_exportar_pdf'),

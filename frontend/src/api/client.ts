@@ -41,6 +41,18 @@ export const clearTokens = () => {
   localStorage.removeItem('gymnisfit_refresh');
 };
 
+export const logout = async () => {
+  const tokens = getTokens();
+  if (tokens?.refresh) {
+    try {
+      await axios.post(`${BASE_URL}auth/logout/`, { refresh: tokens.refresh });
+    } catch {
+      // ignorar error: igual limpiamos local
+    }
+  }
+  clearTokens();
+};
+
 api.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
     const tokens = getTokens();
@@ -89,7 +101,11 @@ api.interceptors.response.use(
         refresh: tokens.refresh,
       });
       const newAccess = response.data.access as string;
-      setTokens({ access: newAccess, refresh: tokens.refresh });
+      const newRefresh = response.data.refresh as string | undefined;
+      setTokens({
+        access: newAccess,
+        refresh: newRefresh || tokens.refresh,
+      });
       processQueue(null, newAccess);
       if (originalRequest.headers) {
         originalRequest.headers.Authorization = `Bearer ${newAccess}`;
