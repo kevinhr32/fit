@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
 import ProtectedRoute from './components/ProtectedRoute';
 import Layout from './components/Layout';
+import EntrenadorLayout from './components/EntrenadorLayout';
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
 import ClienteNuevoPage from './pages/ClienteNuevoPage';
@@ -30,7 +31,9 @@ function App() {
 
       {/* Rutas ENTRENADOR */}
       <Route element={<ProtectedRoute roles={['ENTRENADOR']} />}>
-        <Route path="/entrenador/dashboard" element={<EntrenadorDashboardPage />} />
+        <Route element={<EntrenadorLayout />}>
+          <Route path="/entrenador/dashboard" element={<EntrenadorDashboardPage />} />
+        </Route>
       </Route>
 
       {/* Rutas CLIENTE */}

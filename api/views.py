@@ -473,7 +473,7 @@ class ClaseViewSet(viewsets.ModelViewSet):
             return [IsCliente()]
         if self.action == 'reservas':
             return [IsAdminOrEntrenador()]
-        # create, update, partial_update, destroy
+        # create, update, partial_update, destroy, cancelar
         return [IsEntrenador()]
 
     def get_queryset(self):
@@ -539,6 +539,20 @@ class ClaseViewSet(viewsets.ModelViewSet):
         reserva.estado = 'CANCELADA'
         reserva.save()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @action(detail=True, methods=['post'], url_path='cancelar')
+    def cancelar(self, request, pk=None):
+        """Cancelar una clase (cambiar estado a CANCELADA). Solo el entrenador dueño."""
+        clase = self.get_object()
+        if clase.estado == 'CANCELADA':
+            return Response(
+                {'detail': 'Esta clase ya está cancelada.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        clase.estado = 'CANCELADA'
+        clase.save()
+        serializer = self.get_serializer(clase)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
     @action(detail=True, methods=['get'])
     def reservas(self, request, pk=None):

@@ -107,3 +107,30 @@ export interface PaginatedResponse<T> {
   previous: string | null;
   results: T[];
 }
+
+export interface Clase {
+  id: number;
+  nombre: string;
+  entrenador: number;
+  entrenador_nombre: string;
+  gimnasio: number;
+  fecha_hora_inicio: string;
+  duracion_minutos: number;
+  cupo_maximo: number;
+  descripcion: string;
+  estado: 'ACTIVA' | 'CANCELADA';
+  cupos_disponibles: number;
+  ya_reservado: boolean;
+  creado_en: string;
+}
+
+export interface Reserva {
+  id: number;
+  cliente: number;
+  cliente_nombre: string;
+  cliente_email: string;
+  clase: number;
+  clase_nombre: string;
+  fecha_reserva: string;
+  estado: 'CONFIRMADA' | 'CANCELADA';
+}
