@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import ProtectedRoute from './components/ProtectedRoute';
 import Layout from './components/Layout';
 import EntrenadorLayout from './components/EntrenadorLayout';
+import ClienteLayout from './components/ClienteLayout';
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
 import ClienteNuevoPage from './pages/ClienteNuevoPage';
@@ -10,7 +11,9 @@ import EntrenadoresPage from './pages/EntrenadoresPage';
 import FinanzasPage from './pages/FinanzasPage';
 import ConfiguracionPage from './pages/ConfiguracionPage';
 import EntrenadorDashboardPage from './pages/entrenador/EntrenadorDashboardPage';
-import ClienteDashboardPage from './pages/cliente/ClienteDashboardPage';
+import ClasesDisponiblesPage from './pages/cliente/ClasesDisponiblesPage';
+import MisReservasPage from './pages/cliente/MisReservasPage';
+import MiMembresiaPage from './pages/cliente/MiMembresiaPage';
 
 function App() {
   return (
@@ -38,7 +41,11 @@ function App() {
 
       {/* Rutas CLIENTE */}
       <Route element={<ProtectedRoute roles={['CLIENTE']} />}>
-        <Route path="/cliente/dashboard" element={<ClienteDashboardPage />} />
+        <Route element={<ClienteLayout />}>
+          <Route path="/cliente/clases" element={<ClasesDisponiblesPage />} />
+          <Route path="/cliente/reservas" element={<MisReservasPage />} />
+          <Route path="/cliente/membresia" element={<MiMembresiaPage />} />
+        </Route>
       </Route>
 
       <Route path="*" element={<Navigate to="/login" replace />} />

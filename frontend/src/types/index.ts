@@ -27,6 +27,8 @@ export interface Cliente {
   activo: boolean;
   gimnasio: number;
   estado: EstadoCliente;
+  tiene_cuenta: boolean;
+  user: number | null;
 }
 
 export interface DashboardData {
@@ -131,6 +133,17 @@ export interface Reserva {
   cliente_email: string;
   clase: number;
   clase_nombre: string;
+  entrenador_nombre: string;
+  fecha_hora_inicio: string;
   fecha_reserva: string;
   estado: 'CONFIRMADA' | 'CANCELADA';
+}
+
+export interface MiMembresia {
+  id: number;
+  nombre: string;
+  apellido: string;
+  telefono: string;
+  fecha_vencimiento: string;
+  estado: 'ACTIVO' | 'POR_VENCER' | 'VENCIDO';
 }

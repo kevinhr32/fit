@@ -13,6 +13,7 @@ from .views import (
     GimnasioViewSet,
     LogoutAPIView,
     MiMembresiaAPIView,
+    MisReservasAPIView,
     MyTokenObtainPairView,
     PagoViewSet,
 )
@@ -37,4 +38,5 @@ urlpatterns = [
     }), name='gimnasio'),
     path('clientes/crear-credenciales/', CrearCredencialesClienteAPIView.as_view(), name='crear_credenciales'),
     path('mi-membresia/', MiMembresiaAPIView.as_view(), name='mi_membresia'),
+    path('mis-reservas/', MisReservasAPIView.as_view(), name='mis_reservas'),
 ] + router.urls

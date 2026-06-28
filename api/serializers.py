@@ -139,12 +139,14 @@ class ReservaSerializer(serializers.ModelSerializer):
     cliente_nombre = serializers.CharField(source='cliente.get_full_name', read_only=True)
     cliente_email = serializers.CharField(source='cliente.email', read_only=True)
     clase_nombre = serializers.CharField(source='clase.nombre', read_only=True)
+    entrenador_nombre = serializers.CharField(source='clase.entrenador.get_full_name', read_only=True)
+    fecha_hora_inicio = serializers.DateTimeField(source='clase.fecha_hora_inicio', read_only=True)
 
     class Meta:
         model = Reserva
         fields = [
             'id', 'cliente', 'cliente_nombre', 'cliente_email',
-            'clase', 'clase_nombre',
+            'clase', 'clase_nombre', 'entrenador_nombre', 'fecha_hora_inicio',
             'fecha_reserva', 'estado',
         ]
         read_only_fields = ['cliente', 'clase', 'fecha_reserva', 'estado']

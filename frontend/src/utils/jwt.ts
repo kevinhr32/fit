@@ -32,7 +32,7 @@ export function getDashboardPathForRole(role: User['role']): string {
     case 'ENTRENADOR':
       return '/entrenador/dashboard';
     case 'CLIENTE':
-      return '/cliente/dashboard';
+      return '/cliente/clases';
     default:
       return '/login';
   }

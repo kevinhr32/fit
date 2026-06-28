@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Plus, Pencil, Trash2, RefreshCw, Wallet, MessageCircle } from 'lucide-react';
+import { Plus, Pencil, Trash2, RefreshCw, Wallet, MessageCircle, UserPlus, UserCheck } from 'lucide-react';
 import api from '../api/client';
 import type { Cliente } from '../types';
 import ClienteFormModal from '../components/ClienteFormModal';
 import ConfirmModal from '../components/ConfirmModal';
 import PagoFormModal from '../components/PagoFormModal';
+import ClienteCredencialesModal from '../components/ClienteCredencialesModal';
 import { buildWhatsAppUrl, formatearFechaCorta } from '../utils/whatsapp';
 
 const estadoConfig = {
@@ -66,6 +67,8 @@ export default function ClientesPage() {
   const [clienteAEliminar, setClienteAEliminar] = useState<Cliente | null>(null);
   const [eliminando, setEliminando] = useState(false);
   const [renovandoId, setRenovandoId] = useState<number | null>(null);
+  const [clienteCredenciales, setClienteCredenciales] = useState<Cliente | null>(null);
+  const isCredencialesOpen = clienteCredenciales !== null;
 
   const fetchClientes = async () => {
     setLoading(true);
@@ -144,6 +147,13 @@ export default function ClientesPage() {
 
   const handlePagoSaved = () => {
     setSuccess('Pago registrado correctamente.');
+  };
+
+  const handleCredencialesSaved = (clienteId: number) => {
+    setClientes((prev) =>
+      prev.map((c) => (c.id === clienteId ? { ...c, tiene_cuenta: true } : c))
+    );
+    setSuccess('Cuenta creada correctamente para el cliente.');
   };
 
   if (loading) {
@@ -282,6 +292,23 @@ export default function ClientesPage() {
                             </a>
                           )}
 
+                          {cliente.tiene_cuenta ? (
+                            <span
+                              className="p-1.5 text-success cursor-default"
+                              title="Cuenta creada"
+                            >
+                              <UserCheck size={18} />
+                            </span>
+                          ) : (
+                            <button
+                              onClick={() => setClienteCredenciales(cliente)}
+                              className="p-1.5 text-accent hover:bg-accent/10 rounded-lg transition-colors"
+                              title="Crear cuenta"
+                            >
+                              <UserPlus size={18} />
+                            </button>
+                          )}
+
                           <button
                             onClick={() => setClienteForm(cliente)}
                             className="p-1.5 text-slate hover:text-navy hover:bg-slate/10 rounded-lg transition-colors"
@@ -335,6 +362,14 @@ export default function ClientesPage() {
         onConfirm={handleEliminar}
         onCancel={() => setClienteAEliminar(null)}
         loading={eliminando}
+      />
+
+      <ClienteCredencialesModal
+        clienteId={clienteCredenciales?.id || null}
+        clienteNombre={clienteCredenciales ? `${clienteCredenciales.nombre} ${clienteCredenciales.apellido}` : ''}
+        isOpen={isCredencialesOpen}
+        onClose={() => setClienteCredenciales(null)}
+        onSaved={handleCredencialesSaved}
       />
     </div>
   );

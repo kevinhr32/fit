@@ -641,3 +641,15 @@ class MiMembresiaAPIView(APIView):
             'fecha_vencimiento': cliente.fecha_vencimiento,
             'estado': cliente.estado,
         })
+
+
+class MisReservasAPIView(APIView):
+    """El cliente logueado ve sus propias reservas."""
+    permission_classes = [IsCliente]
+
+    def get(self, request):
+        reservas = Reserva.objects.filter(
+            cliente=request.user
+        ).select_related('clase', 'clase__entrenador').order_by('-fecha_reserva')
+        serializer = ReservaSerializer(reservas, many=True)
+        return Response(serializer.data)
