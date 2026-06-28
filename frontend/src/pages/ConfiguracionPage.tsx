@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import api from '../api/client';
 import type { User } from '../types';
+import { getRoleFromToken } from '../utils/jwt';
 
 function formatApiError(err: any): string {
   if (err?.response?.data) {
@@ -19,31 +20,6 @@ function formatApiError(err: any): string {
     if (messages.length > 0) return messages.join('; ');
   }
   return 'No se pudo guardar la configuración.';
-}
-
-function decodeBase64Url(base64url: string): string {
-  let base64 = base64url.replace(/-/g, '+').replace(/_/g, '/');
-  const padding = base64.length % 4;
-  if (padding) {
-    base64 += '='.repeat(4 - padding);
-  }
-  return decodeURIComponent(
-    atob(base64)
-      .split('')
-      .map((c) => `%${c.charCodeAt(0).toString(16).padStart(2, '0')}`)
-      .join('')
-  );
-}
-
-function getRoleFromToken(): User['role'] | null {
-  const access = localStorage.getItem('gymnisfit_access');
-  if (!access) return null;
-  try {
-    const payload = JSON.parse(decodeBase64Url(access.split('.')[1]));
-    return payload.role;
-  } catch {
-    return null;
-  }
 }
 
 export default function ConfiguracionPage() {

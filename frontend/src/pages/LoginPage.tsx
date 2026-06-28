@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api, { setTokens } from '../api/client';
+import { getRoleFromToken, getDashboardPathForRole } from '../utils/jwt';
 import Logo from '../components/Logo';
 
 export default function LoginPage() {
@@ -21,7 +22,9 @@ export default function LoginPage() {
         access: response.data.access,
         refresh: response.data.refresh,
       });
-      navigate('/dashboard', { replace: true });
+      const role = getRoleFromToken();
+      const path = role ? getDashboardPathForRole(role) : '/dashboard';
+      navigate(path, { replace: true });
     } catch (err) {
       setError('Correo o contraseña incorrectos.');
     } finally {

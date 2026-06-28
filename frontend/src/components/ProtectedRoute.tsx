@@ -1,7 +1,28 @@
 import { Navigate, Outlet } from 'react-router-dom';
 import { getTokens } from '../api/client';
+import { getRoleFromToken, getDashboardPathForRole } from '../utils/jwt';
+import type { User } from '../types';
 
-export default function ProtectedRoute() {
+interface ProtectedRouteProps {
+  roles?: User['role'][];
+}
+
+export default function ProtectedRoute({ roles }: ProtectedRouteProps) {
   const tokens = getTokens();
-  return tokens?.access ? <Outlet /> : <Navigate to="/login" replace />;
+
+  if (!tokens?.access) {
+    return <Navigate to="/login" replace />;
+  }
+
+  if (!roles) {
+    return <Outlet />;
+  }
+
+  const role = getRoleFromToken();
+  if (!role || !roles.includes(role)) {
+    const redirectPath = role ? getDashboardPathForRole(role) : '/login';
+    return <Navigate to={redirectPath} replace />;
+  }
+
+  return <Outlet />;
 }

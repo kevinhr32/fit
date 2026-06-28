@@ -8,12 +8,16 @@ import ClientesPage from './pages/ClientesPage';
 import EntrenadoresPage from './pages/EntrenadoresPage';
 import FinanzasPage from './pages/FinanzasPage';
 import ConfiguracionPage from './pages/ConfiguracionPage';
+import EntrenadorDashboardPage from './pages/entrenador/EntrenadorDashboardPage';
+import ClienteDashboardPage from './pages/cliente/ClienteDashboardPage';
 
 function App() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
-      <Route element={<ProtectedRoute />}>
+
+      {/* Rutas ADMIN */}
+      <Route element={<ProtectedRoute roles={['ADMIN']} />}>
         <Route element={<Layout />}>
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/clientes" element={<ClientesPage />} />
@@ -23,7 +27,18 @@ function App() {
           <Route path="/configuracion" element={<ConfiguracionPage />} />
         </Route>
       </Route>
-      <Route path="*" element={<Navigate to="/dashboard" replace />} />
+
+      {/* Rutas ENTRENADOR */}
+      <Route element={<ProtectedRoute roles={['ENTRENADOR']} />}>
+        <Route path="/entrenador/dashboard" element={<EntrenadorDashboardPage />} />
+      </Route>
+
+      {/* Rutas CLIENTE */}
+      <Route element={<ProtectedRoute roles={['CLIENTE']} />}>
+        <Route path="/cliente/dashboard" element={<ClienteDashboardPage />} />
+      </Route>
+
+      <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>
   );
 }
