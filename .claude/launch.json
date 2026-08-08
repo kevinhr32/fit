@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "gymnisfit-frontend",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "frontend", "run", "dev"],
+      "port": 5173
+    },
+    {
+      "name": "sena-ev02-prototipo",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-m", "http.server", "8791", "--directory", "C:/Users/Kevin Programador/Downloads/SENA-GA7-EV02/prototipo-gymnisfit"],
+      "port": 8791
+    }
+  ]
+}
