@@ -15,6 +15,15 @@ export interface Gimnasio {
   creado_en: string;
 }
 
+export interface PlanMembresia {
+  id: number;
+  gimnasio: number;
+  nombre: string;
+  dias: number;
+  activo: boolean;
+  creado_en: string;
+}
+
 export type EstadoCliente = 'ACTIVO' | 'POR_VENCER' | 'VENCIDO';
 
 export interface Cliente {
@@ -146,4 +155,92 @@ export interface MiMembresia {
   telefono: string;
   fecha_vencimiento: string;
   estado: 'ACTIVO' | 'POR_VENCER' | 'VENCIDO';
+}
+
+export interface Progreso {
+  id: number;
+  fecha: string;
+  peso: string;
+  foto: string | null;
+  nota: string;
+}
+
+export type NivelRutina = 'PRINCIPIANTE' | 'INTERMEDIO' | 'AVANZADO';
+
+export interface Ejercicio {
+  id: number;
+  rutina: number;
+  nombre: string;
+  series: number;
+  repeticiones: string;
+  descanso_segundos: number | null;
+  video_url: string;
+  imagen: string | null;
+  orden: number;
+}
+
+export interface Rutina {
+  id: number;
+  nombre: string;
+  nivel: NivelRutina;
+  descripcion: string;
+  gimnasio: number;
+  ejercicios: Ejercicio[];
+  creado_en: string;
+}
+
+export type EstadoReto = 'PROXIMO' | 'ACTIVO' | 'FINALIZADO';
+
+export interface ParticipacionReto {
+  id: number;
+  reto: number;
+  cliente: number;
+  cliente_nombre: string;
+  progreso_actual: number;
+  completado: boolean;
+  fecha_union: string;
+  fecha_completado: string | null;
+}
+
+export interface Reto {
+  id: number;
+  gimnasio: number;
+  nombre: string;
+  descripcion: string;
+  meta: number;
+  unidad: string;
+  fecha_inicio: string;
+  fecha_fin: string;
+  estado: EstadoReto;
+  participantes_count: number;
+  mi_participacion: ParticipacionReto | null;
+  creado_en: string;
+}
+
+export interface Logro {
+  id: number;
+  cliente: number;
+  cliente_nombre: string;
+  tipo: string;
+  descripcion: string;
+  reto: number | null;
+  fecha_obtenido: string;
+}
+
+export interface FeedResponse {
+  habilitado: boolean;
+  logros: Logro[];
+}
+
+export interface LiderRanking {
+  cliente_id: number;
+  nombre: string;
+  apellido: string;
+  total_logros: number;
+  soy_yo: boolean;
+}
+
+export interface TablaLideresResponse {
+  habilitado: boolean;
+  ranking: LiderRanking[];
 }

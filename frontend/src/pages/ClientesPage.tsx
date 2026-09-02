@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Plus, Pencil, Trash2, RefreshCw, Wallet, MessageCircle, UserPlus, UserCheck } from 'lucide-react';
 import api from '../api/client';
-import type { Cliente } from '../types';
+import type { Cliente, PlanMembresia } from '../types';
 import ClienteFormModal from '../components/ClienteFormModal';
 import ConfirmModal from '../components/ConfirmModal';
 import PagoFormModal from '../components/PagoFormModal';
 import ClienteCredencialesModal from '../components/ClienteCredencialesModal';
 import { buildWhatsAppUrl, formatearFechaCorta } from '../utils/whatsapp';
+import { diasHastaVencimiento, esRenovable } from '../utils/membresia';
 
 const estadoConfig = {
   VENCIDO: {
@@ -70,16 +71,26 @@ export default function ClientesPage() {
   const [clienteCredenciales, setClienteCredenciales] = useState<Cliente | null>(null);
   const isCredencialesOpen = clienteCredenciales !== null;
 
+  const [planes, setPlanes] = useState<PlanMembresia[]>([]);
+  const [diasPorCliente, setDiasPorCliente] = useState<Record<number, number>>({});
+
+  const planesActivos = useMemo(() => planes.filter((p) => p.activo), [planes]);
+
+  const diasParaRenovar = (clienteId: number) =>
+    diasPorCliente[clienteId] ?? planesActivos[0]?.dias ?? 30;
+
   const fetchClientes = async () => {
     setLoading(true);
     setError('');
     try {
-      const [clientesRes, gymRes] = await Promise.all([
+      const [clientesRes, gymRes, planesRes] = await Promise.all([
         api.get<Cliente[]>('clientes/'),
         api.get<{ nombre: string }>('gimnasio/'),
+        api.get<PlanMembresia[]>('planes-membresia/'),
       ]);
       setClientes(clientesRes.data);
       setGymName(gymRes.data.nombre);
+      setPlanes(planesRes.data);
     } catch (err) {
       setError(formatApiError(err));
     } finally {
@@ -119,13 +130,13 @@ export default function ClientesPage() {
     setRenovandoId(id);
     try {
       const response = await api.post<Cliente>(`clientes/${id}/renovar/`, {
-        dias: 30,
+        dias: diasParaRenovar(id),
       });
       setClientes((prev) =>
         prev.map((c) => (c.id === response.data.id ? response.data : c))
       );
     } catch (err) {
-      alert('No se pudo renovar la membresía.');
+      alert(formatApiError(err));
     } finally {
       setRenovandoId(null);
     }
@@ -236,6 +247,8 @@ export default function ClientesPage() {
               <tbody className="divide-y divide-slate/10">
                 {filteredClientes.map((cliente) => {
                   const config = estadoConfig[cliente.estado];
+                  const renovable = esRenovable(cliente.fecha_vencimiento);
+                  const diasRestantes = diasHastaVencimiento(cliente.fecha_vencimiento);
                   const whatsappUrl =
                     cliente.telefono && gymName && (cliente.estado === 'VENCIDO' || cliente.estado === 'POR_VENCER')
                       ? buildWhatsAppUrl(
@@ -263,14 +276,44 @@ export default function ClientesPage() {
                       </td>
                       <td className="px-5 py-4">
                         <div className="flex items-center justify-end gap-2">
-                          <button
-                            onClick={() => handleRenovar(cliente.id)}
-                            disabled={renovandoId === cliente.id}
-                            className="inline-flex items-center gap-1.5 bg-accent/10 hover:bg-accent/20 text-accent text-xs font-medium px-3 py-1.5 rounded-lg transition-colors disabled:opacity-60"
+                          <div
+                            className="inline-flex items-center rounded-lg overflow-hidden border border-accent/20"
+                            title={
+                              renovable
+                                ? undefined
+                                : `Todavía faltan ${diasRestantes} días para el vencimiento; solo se puede renovar con 7 días o menos de anticipación.`
+                            }
                           >
-                            <RefreshCw size={14} className={renovandoId === cliente.id ? 'animate-spin' : ''} />
-                            {renovandoId === cliente.id ? 'Renovando' : 'Renovar 30 días'}
-                          </button>
+                            {planesActivos.length > 1 && (
+                              <select
+                                value={diasParaRenovar(cliente.id)}
+                                onChange={(e) =>
+                                  setDiasPorCliente((prev) => ({
+                                    ...prev,
+                                    [cliente.id]: parseInt(e.target.value, 10),
+                                  }))
+                                }
+                                disabled={!renovable}
+                                className="bg-accent/10 text-accent text-xs font-medium pl-2.5 pr-1 py-1.5 outline-none disabled:opacity-60 disabled:cursor-not-allowed"
+                              >
+                                {planesActivos.map((plan) => (
+                                  <option key={plan.id} value={plan.dias}>
+                                    {plan.nombre || `${plan.dias}d`}
+                                  </option>
+                                ))}
+                              </select>
+                            )}
+                            <button
+                              onClick={() => handleRenovar(cliente.id)}
+                              disabled={renovandoId === cliente.id || !renovable || planesActivos.length === 0}
+                              className="inline-flex items-center gap-1.5 bg-accent/10 hover:bg-accent/20 text-accent text-xs font-medium pl-2 pr-3 py-1.5 transition-colors disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:bg-accent/10"
+                            >
+                              <RefreshCw size={14} className={renovandoId === cliente.id ? 'animate-spin' : ''} />
+                              {renovandoId === cliente.id
+                                ? 'Renovando'
+                                : `Renovar ${diasParaRenovar(cliente.id)}d`}
+                            </button>
+                          </div>
 
                           <button
                             onClick={() => setClientePago(cliente)}

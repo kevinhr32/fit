@@ -6,7 +6,19 @@ from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
 from accounts.models import User
-from gimnasio.models import Cliente, Clase, Gimnasio, Pago, Reserva
+from gimnasio.models import (
+    Cliente,
+    Clase,
+    Gimnasio,
+    LogroObtenido,
+    Pago,
+    ParticipacionReto,
+    PlanMembresia,
+    Progreso,
+    Reserva,
+    Reto,
+)
+from rutinas.models import Ejercicio, Rutina
 
 
 class MyTokenObtainPairSerializer(TokenObtainPairSerializer):
@@ -30,7 +42,7 @@ class MyTokenObtainPairSerializer(TokenObtainPairSerializer):
 class GimnasioSerializer(serializers.ModelSerializer):
     class Meta:
         model = Gimnasio
-        fields = ['id', 'nombre', 'creado_en']
+        fields = ['id', 'nombre', 'feed_habilitado', 'creado_en']
         read_only_fields = ['creado_en']
 
 
@@ -68,6 +80,18 @@ class ClienteSerializer(serializers.ModelSerializer):
     def update(self, instance, validated_data):
         validated_data = self._aplicar_plan(validated_data)
         return super().update(instance, validated_data)
+
+
+class PlanMembresiaSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PlanMembresia
+        fields = ['id', 'gimnasio', 'nombre', 'dias', 'activo', 'creado_en']
+        read_only_fields = ['gimnasio', 'creado_en']
+
+    def validate_dias(self, value):
+        if value < 1:
+            raise serializers.ValidationError('La duración del plan debe ser de al menos 1 día.')
+        return value
 
 
 class PagoSerializer(serializers.ModelSerializer):
@@ -150,6 +174,78 @@ class ReservaSerializer(serializers.ModelSerializer):
             'fecha_reserva', 'estado',
         ]
         read_only_fields = ['cliente', 'clase', 'fecha_reserva', 'estado']
+
+
+class ProgresoSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Progreso
+        fields = ['id', 'fecha', 'peso', 'foto', 'nota']
+        read_only_fields = ['fecha']
+
+
+class EjercicioSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Ejercicio
+        fields = [
+            'id', 'rutina', 'nombre', 'series', 'repeticiones',
+            'descanso_segundos', 'video_url', 'imagen', 'orden',
+        ]
+
+
+class RutinaSerializer(serializers.ModelSerializer):
+    ejercicios = EjercicioSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Rutina
+        fields = ['id', 'nombre', 'nivel', 'descripcion', 'gimnasio', 'ejercicios', 'creado_en']
+        read_only_fields = ['gimnasio', 'creado_en']
+
+
+class RetoSerializer(serializers.ModelSerializer):
+    estado = serializers.CharField(read_only=True)
+    participantes_count = serializers.SerializerMethodField()
+    mi_participacion = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Reto
+        fields = [
+            'id', 'gimnasio', 'nombre', 'descripcion', 'meta', 'unidad',
+            'fecha_inicio', 'fecha_fin', 'estado', 'participantes_count',
+            'mi_participacion', 'creado_en',
+        ]
+        read_only_fields = ['gimnasio', 'creado_en']
+
+    def get_participantes_count(self, obj):
+        return obj.participaciones.count()
+
+    def get_mi_participacion(self, obj):
+        request = self.context.get('request')
+        if not request or not request.user.is_authenticated or request.user.role != 'CLIENTE':
+            return None
+        participacion = obj.participaciones.filter(cliente__user=request.user).first()
+        if not participacion:
+            return None
+        return ParticipacionRetoSerializer(participacion).data
+
+
+class ParticipacionRetoSerializer(serializers.ModelSerializer):
+    cliente_nombre = serializers.CharField(source='cliente.__str__', read_only=True)
+
+    class Meta:
+        model = ParticipacionReto
+        fields = [
+            'id', 'reto', 'cliente', 'cliente_nombre', 'progreso_actual',
+            'completado', 'fecha_union', 'fecha_completado',
+        ]
+        read_only_fields = ['cliente', 'completado', 'fecha_union', 'fecha_completado']
+
+
+class LogroObtenidoSerializer(serializers.ModelSerializer):
+    cliente_nombre = serializers.CharField(source='cliente.__str__', read_only=True)
+
+    class Meta:
+        model = LogroObtenido
+        fields = ['id', 'cliente', 'cliente_nombre', 'tipo', 'descripcion', 'reto', 'fecha_obtenido']
 
 
 class ClienteCredencialesSerializer(serializers.Serializer):

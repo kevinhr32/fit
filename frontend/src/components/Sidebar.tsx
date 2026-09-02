@@ -1,4 +1,4 @@
-import { LayoutDashboard, Users, Dumbbell, Wallet, Settings, LogOut } from 'lucide-react';
+import { LayoutDashboard, Users, Dumbbell, Trophy, Wallet, Settings, LogOut } from 'lucide-react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import Logo from './Logo';
 import { logout } from '../api/client';
@@ -7,6 +7,7 @@ const navItems = [
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/clientes', label: 'Clientes', icon: Users },
   { to: '/entrenadores', label: 'Entrenadores', icon: Dumbbell },
+  { to: '/retos', label: 'Retos', icon: Trophy },
   { to: '/finanzas', label: 'Finanzas', icon: Wallet },
   { to: '/configuracion', label: 'Configuración', icon: Settings },
 ];

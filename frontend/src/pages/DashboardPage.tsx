@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
 import api from '../api/client';
-import type { DashboardData } from '../types';
+import type { DashboardData, PlanMembresia } from '../types';
 import Header from '../components/Header';
 import StatCard from '../components/StatCard';
 import ClienteCard from '../components/ClienteCard';
 
 export default function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
+  const [planes, setPlanes] = useState<PlanMembresia[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -14,8 +15,12 @@ export default function DashboardPage() {
     setLoading(true);
     setError('');
     try {
-      const response = await api.get<DashboardData>('dashboard/');
-      setData(response.data);
+      const [dashboardRes, planesRes] = await Promise.all([
+        api.get<DashboardData>('dashboard/'),
+        api.get<PlanMembresia[]>('planes-membresia/'),
+      ]);
+      setData(dashboardRes.data);
+      setPlanes(planesRes.data.filter((p) => p.activo));
     } catch (err) {
       setError('No se pudo cargar el dashboard.');
     } finally {
@@ -100,6 +105,7 @@ export default function DashboardPage() {
                 key={cliente.id}
                 cliente={cliente}
                 gymName={data.gimnasio.nombre}
+                planes={planes}
                 onRenovar={handleRenovar}
               />
             ))}

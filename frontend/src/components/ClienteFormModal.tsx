@@ -89,7 +89,17 @@ export default function ClienteFormModal({
     try {
       let response;
       if (isEdit && cliente) {
-        response = await api.patch<Cliente>(`clientes/${cliente.id}/`, form);
+        // Al editar NO se manda plan_dias: el backend (ClienteSerializer._aplicar_plan)
+        // recalcula fecha_vencimiento = fecha_inicio + plan_dias en cada update, lo que
+        // borraría silenciosamente una renovación ya aplicada vía el botón "Renovar".
+        // Cambiar la fecha de vencimiento tiene su propio flujo (acción /renovar/).
+        const datosEdicion = {
+          nombre: form.nombre,
+          apellido: form.apellido,
+          telefono: form.telefono,
+          fecha_inicio: form.fecha_inicio,
+        };
+        response = await api.patch<Cliente>(`clientes/${cliente.id}/`, datosEdicion);
       } else {
         response = await api.post<Cliente>('clientes/', form);
       }
@@ -178,7 +188,7 @@ export default function ClienteFormModal({
             />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <div className={`grid grid-cols-1 ${isEdit ? '' : 'md:grid-cols-2'} gap-5`}>
             <div>
               <label htmlFor="fecha_inicio" className="block text-sm font-medium text-navy mb-1">
                 Fecha de inicio
@@ -194,26 +204,34 @@ export default function ClienteFormModal({
               />
             </div>
 
-            <div>
-              <label htmlFor="plan_dias" className="block text-sm font-medium text-navy mb-1">
-                Días del plan
-              </label>
-              <select
-                id="plan_dias"
-                name="plan_dias"
-                value={form.plan_dias}
-                onChange={handleChange}
-                required
-                className="w-full px-4 py-2.5 rounded-lg border border-slate/30 bg-white text-navy focus:border-accent focus:ring-1 focus:ring-accent outline-none transition-colors"
-              >
-                {PLAN_DIAS_OPTIONS.map((dias) => (
-                  <option key={dias} value={dias}>
-                    {dias} días
-                  </option>
-                ))}
-              </select>
-            </div>
+            {!isEdit && (
+              <div>
+                <label htmlFor="plan_dias" className="block text-sm font-medium text-navy mb-1">
+                  Días del plan
+                </label>
+                <select
+                  id="plan_dias"
+                  name="plan_dias"
+                  value={form.plan_dias}
+                  onChange={handleChange}
+                  required
+                  className="w-full px-4 py-2.5 rounded-lg border border-slate/30 bg-white text-navy focus:border-accent focus:ring-1 focus:ring-accent outline-none transition-colors"
+                >
+                  {PLAN_DIAS_OPTIONS.map((dias) => (
+                    <option key={dias} value={dias}>
+                      {dias} días
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
+
+          {isEdit && (
+            <p className="text-xs text-slate/70 -mt-2">
+              Para extender la membresía usa el botón "Renovar" en la lista de clientes.
+            </p>
+          )}
 
           <div className="pt-2 flex gap-3">
             <button

@@ -64,3 +64,12 @@ def create_gimnasio_for_admin(sender, instance, created, **kwargs):
             owner=instance,
             defaults={'nombre': f'Gimnasio de {instance.email}'}
         )
+        # Un ADMIN es dueño de su propio gimnasio, no entrenador de otro: si el
+        # usuario tenía un `gimnasio` heredado de cuando era ENTRENADOR (o de un
+        # rol previo), hay que limpiarlo para que no quede una relación fantasma
+        # si más adelante su rol se revierte a ENTRENADOR.
+        # Se usa .update() (no instance.save()) para no re-disparar esta misma
+        # señal en un bucle infinito.
+        if instance.gimnasio_id is not None:
+            User.objects.filter(pk=instance.pk).update(gimnasio=None)
+            instance.gimnasio_id = None

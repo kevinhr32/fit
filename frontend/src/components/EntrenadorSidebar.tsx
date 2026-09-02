@@ -1,10 +1,11 @@
-import { Dumbbell, LogOut } from 'lucide-react';
+import { Dumbbell, LogOut, ListChecks } from 'lucide-react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import Logo from './Logo';
 import { logout } from '../api/client';
 
 const navItems = [
   { to: '/entrenador/dashboard', label: 'Mis Clases', icon: Dumbbell },
+  { to: '/entrenador/rutinas', label: 'Rutinas', icon: ListChecks },
 ];
 
 export default function EntrenadorSidebar() {

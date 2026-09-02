@@ -1,7 +1,9 @@
 from datetime import date, timedelta
 
-from django.db.models import Sum
+from django.db import IntegrityError, transaction
+from django.db.models import Count, Sum
 from django.http import HttpResponse
+from django.utils import timezone
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import getSampleStyleSheet
@@ -19,19 +21,40 @@ from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.views import TokenObtainPairView
 
 from accounts.models import User
-from gimnasio.models import Cliente, Clase, Gimnasio, Pago, Reserva
+from gimnasio.models import (
+    Cliente,
+    Clase,
+    DIAS_PARA_POR_VENCER,
+    Gimnasio,
+    LogroObtenido,
+    Pago,
+    ParticipacionReto,
+    PlanMembresia,
+    Progreso,
+    Reserva,
+    Reto,
+)
+from gimnasio.logros import revisar_completar_reto, revisar_logros_asistencia, revisar_logros_progreso
 from gimnasio.utils import formatear_pesos
+from rutinas.models import Ejercicio, Rutina
 
 from .permissions import IsAdmin, IsAdminOrEntrenador, IsCliente, IsClienteActivo, IsEntrenador
 from .throttles import LoginRateThrottle
 from .serializers import (
     ClienteSerializer,
     ClaseSerializer,
+    EjercicioSerializer,
     EntrenadorSerializer,
     GimnasioSerializer,
+    LogroObtenidoSerializer,
     MyTokenObtainPairSerializer,
     PagoSerializer,
+    ParticipacionRetoSerializer,
+    PlanMembresiaSerializer,
+    ProgresoSerializer,
     ReservaSerializer,
+    RetoSerializer,
+    RutinaSerializer,
 )
 
 
@@ -165,14 +188,48 @@ class ClienteViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'], url_path='renovar')
     def renovar(self, request, pk=None):
-        """Renovar la membresía de un cliente extendiendo su fecha de vencimiento."""
+        """Renovar la membresía de un cliente extendiendo su fecha de vencimiento.
+
+        Solo permitido si al cliente le quedan DIAS_PARA_POR_VENCER días o menos
+        (incluye membresías ya vencidas) y con una duración ('dias') que coincida
+        con uno de los planes de membresía activos configurados por el gimnasio.
+        """
         cliente = self.get_object()
-        dias = request.data.get('dias', 30)
+        dias_restantes = (cliente.fecha_vencimiento - date.today()).days
+        if dias_restantes > DIAS_PARA_POR_VENCER:
+            return Response(
+                {
+                    'detail': (
+                        f'Todavía faltan {dias_restantes} días para el vencimiento; '
+                        f'solo se puede renovar con {DIAS_PARA_POR_VENCER} días o '
+                        'menos de anticipación.'
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        dias = request.data.get('dias')
         try:
             dias = int(dias)
         except (TypeError, ValueError):
             return Response(
                 {'detail': 'El campo "dias" debe ser un número entero válido.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        gimnasio = _get_user_gimnasio(request.user)
+        planes_validos = list(
+            PlanMembresia.objects.filter(gimnasio=gimnasio, activo=True)
+            .values_list('dias', flat=True)
+        )
+        if dias not in planes_validos:
+            return Response(
+                {
+                    'detail': (
+                        f'"{dias}" no es un plan de membresía activo de tu gimnasio. '
+                        f'Planes disponibles: {sorted(planes_validos)}.'
+                    )
+                },
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -183,6 +240,28 @@ class ClienteViewSet(viewsets.ModelViewSet):
 
         serializer = self.get_serializer(cliente)
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class PlanMembresiaViewSet(viewsets.ModelViewSet):
+    """CRUD de los planes de membresía (duraciones en días) que ofrece el gimnasio.
+
+    Solo el ADMIN los administra. Se usan como opciones válidas al dar de alta o
+    renovar un cliente (ver ClienteViewSet.renovar).
+    """
+    serializer_class = PlanMembresiaSerializer
+    permission_classes = [IsAdmin]
+
+    def get_queryset(self):
+        gimnasio = _get_user_gimnasio(self.request.user)
+        if not gimnasio:
+            return PlanMembresia.objects.none()
+        return PlanMembresia.objects.filter(gimnasio=gimnasio)
+
+    def perform_create(self, serializer):
+        gimnasio = _get_user_gimnasio(self.request.user)
+        if not gimnasio:
+            raise NotFound('No tienes un gimnasio asignado.')
+        serializer.save(gimnasio=gimnasio)
 
 
 class PagoPagination(PageNumberPagination):
@@ -458,9 +537,9 @@ class ExportarPagosPDFAPIView(APIView):
 class ClaseViewSet(viewsets.ModelViewSet):
     """CRUD de clases del gimnasio.
 
-    - ENTRENADOR crea/edita/elimina solo sus propias clases.
-    - ADMIN puede ver todas las clases pero no crear/editar.
-    - CLIENTE puede ver clases y reservar/cancelar.
+    - ENTRENADOR ve, crea, edita y elimina solo sus propias clases (su "Mis Clases").
+    - ADMIN puede ver todas las clases del gimnasio pero no crear/editar.
+    - CLIENTE puede ver todas las clases del gimnasio y reservar/cancelar.
     """
     serializer_class = ClaseSerializer
 
@@ -481,8 +560,12 @@ class ClaseViewSet(viewsets.ModelViewSet):
         if not gimnasio:
             return Clase.objects.none()
         qs = Clase.objects.filter(gimnasio=gimnasio)
-        # Entrenador solo puede editar/eliminar sus propias clases
-        if self.request.user.role == 'ENTRENADOR' and self.action in ('update', 'partial_update', 'destroy'):
+        # Entrenador solo edita/elimina/cancela sus propias clases, y su listado
+        # ("Mis Clases" en el frontend) también son solo las suyas — no las de
+        # todo el gimnasio. ADMIN y CLIENTE sí ven el listado completo del gym.
+        if self.request.user.role == 'ENTRENADOR' and self.action in (
+            'list', 'update', 'partial_update', 'destroy'
+        ):
             qs = qs.filter(entrenador=self.request.user)
         return qs
 
@@ -503,10 +586,9 @@ class ClaseViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        confirmadas = clase.reservas.filter(estado='CONFIRMADA').count()
-        if confirmadas >= clase.cupo_maximo:
+        if clase.fecha_hora_inicio < timezone.now():
             return Response(
-                {'detail': 'No hay cupos disponibles para esta clase.'},
+                {'detail': 'Esta clase ya ocurrió, no se puede reservar.'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -519,7 +601,26 @@ class ClaseViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        reserva = Reserva.objects.create(cliente=request.user, clase=clase)
+        # select_for_update() bloquea la fila de la clase mientras dure la
+        # transacción, así que si dos clientes reservan el último cupo casi al
+        # mismo tiempo, el segundo espera a que el primero termine de contar
+        # y crear su reserva antes de hacer su propio conteo (evita sobrecupo
+        # por condición de carrera). En SQLite (dev) Django ignora el bloqueo
+        # de fila pero la transacción igual serializa las escrituras.
+        with transaction.atomic():
+            clase = Clase.objects.select_for_update().get(pk=clase.pk)
+            confirmadas = clase.reservas.filter(estado='CONFIRMADA').count()
+            if confirmadas >= clase.cupo_maximo:
+                return Response(
+                    {'detail': 'No hay cupos disponibles para esta clase.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            reserva = Reserva.objects.create(cliente=request.user, clase=clase)
+
+        cliente_perfil = getattr(request.user, 'cliente_perfil', None)
+        if cliente_perfil:
+            revisar_logros_asistencia(cliente_perfil)
+
         serializer = ReservaSerializer(reserva)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
@@ -544,6 +645,10 @@ class ClaseViewSet(viewsets.ModelViewSet):
     def cancelar(self, request, pk=None):
         """Cancelar una clase (cambiar estado a CANCELADA). Solo el entrenador dueño."""
         clase = self.get_object()
+        # Entrenador solo puede cancelar sus propias clases (mismo criterio que
+        # update/partial_update/destroy en get_queryset y que la acción 'reservas').
+        if request.user.role == 'ENTRENADOR' and clase.entrenador_id != request.user.id:
+            raise PermissionDenied('Solo puedes cancelar tus propias clases.')
         if clase.estado == 'CANCELADA':
             return Response(
                 {'detail': 'Esta clase ya está cancelada.'},
@@ -641,6 +746,262 @@ class MiMembresiaAPIView(APIView):
             'fecha_vencimiento': cliente.fecha_vencimiento,
             'estado': cliente.estado,
         })
+
+
+class RutinaViewSet(viewsets.ModelViewSet):
+    """CRUD de rutinas de ejercicio para principiantes.
+
+    - ADMIN y ENTRENADOR crean/editan/eliminan rutinas de su gimnasio.
+    - CLIENTE solo puede ver (read-only).
+    """
+    serializer_class = RutinaSerializer
+
+    def get_permissions(self):
+        if self.action in ('list', 'retrieve'):
+            return [IsAuthenticated()]
+        return [IsAdminOrEntrenador()]
+
+    def get_queryset(self):
+        gimnasio = _get_user_gimnasio(self.request.user)
+        if not gimnasio:
+            return Rutina.objects.none()
+        return Rutina.objects.filter(gimnasio=gimnasio).prefetch_related('ejercicios')
+
+    def perform_create(self, serializer):
+        gimnasio = _get_user_gimnasio(self.request.user)
+        if not gimnasio:
+            raise NotFound('No tienes un gimnasio asignado.')
+        serializer.save(gimnasio=gimnasio)
+
+
+class EjercicioViewSet(viewsets.ModelViewSet):
+    """CRUD de ejercicios dentro de una rutina.
+
+    - ADMIN y ENTRENADOR crean/editan/eliminan ejercicios de rutinas de su gimnasio.
+    - CLIENTE solo puede ver (read-only).
+    """
+    serializer_class = EjercicioSerializer
+
+    def get_permissions(self):
+        if self.action in ('list', 'retrieve'):
+            return [IsAuthenticated()]
+        return [IsAdminOrEntrenador()]
+
+    def get_queryset(self):
+        gimnasio = _get_user_gimnasio(self.request.user)
+        if not gimnasio:
+            return Ejercicio.objects.none()
+        qs = Ejercicio.objects.filter(rutina__gimnasio=gimnasio)
+        rutina_id = self.request.query_params.get('rutina_id')
+        if rutina_id:
+            qs = qs.filter(rutina_id=rutina_id)
+        return qs
+
+    def _validar_rutina_del_gimnasio(self, gimnasio, rutina):
+        if not rutina or rutina.gimnasio_id != getattr(gimnasio, 'id', None):
+            raise PermissionDenied('La rutina no pertenece a tu gimnasio.')
+
+    def perform_create(self, serializer):
+        gimnasio = _get_user_gimnasio(self.request.user)
+        rutina = serializer.validated_data.get('rutina')
+        self._validar_rutina_del_gimnasio(gimnasio, rutina)
+        serializer.save()
+
+    def perform_update(self, serializer):
+        gimnasio = _get_user_gimnasio(self.request.user)
+        # Si el payload no trae 'rutina' (PATCH parcial), se valida la rutina
+        # actual del ejercicio; si la trae, se valida la nueva para evitar que
+        # un ejercicio se reasigne a una rutina de otro gimnasio.
+        rutina = serializer.validated_data.get('rutina', serializer.instance.rutina)
+        self._validar_rutina_del_gimnasio(gimnasio, rutina)
+        serializer.save()
+
+
+class ProgresoViewSet(
+    mixins.CreateModelMixin,
+    mixins.ListModelMixin,
+    mixins.DestroyModelMixin,
+    viewsets.GenericViewSet,
+):
+    """El cliente registra y consulta su propio progreso (peso, foto, nota). Privado, sin visibilidad para el gimnasio."""
+    serializer_class = ProgresoSerializer
+    permission_classes = [IsCliente]
+
+    def get_queryset(self):
+        cliente = getattr(self.request.user, 'cliente_perfil', None)
+        if not cliente:
+            return Progreso.objects.none()
+        return Progreso.objects.filter(cliente=cliente)
+
+    def perform_create(self, serializer):
+        cliente = getattr(self.request.user, 'cliente_perfil', None)
+        if not cliente:
+            raise PermissionDenied('No tienes un perfil de cliente asociado.')
+        serializer.save(cliente=cliente)
+        revisar_logros_progreso(cliente)
+
+
+class RetoViewSet(viewsets.ModelViewSet):
+    """CRUD de retos del gimnasio.
+
+    - ADMIN crea/edita/elimina retos de su gimnasio.
+    - ENTRENADOR y CLIENTE solo pueden ver.
+    - CLIENTE además puede unirse y actualizar su propio progreso.
+    """
+    serializer_class = RetoSerializer
+
+    def get_permissions(self):
+        if self.action in ('list', 'retrieve'):
+            return [IsAuthenticated()]
+        if self.action in ('unirse', 'actualizar_progreso'):
+            return [IsCliente()]
+        return [IsAdmin()]
+
+    def get_queryset(self):
+        gimnasio = _get_user_gimnasio(self.request.user)
+        if not gimnasio:
+            return Reto.objects.none()
+        return Reto.objects.filter(gimnasio=gimnasio).prefetch_related('participaciones')
+
+    def perform_create(self, serializer):
+        gimnasio = _get_user_gimnasio(self.request.user)
+        if not gimnasio:
+            raise NotFound('No tienes un gimnasio asignado.')
+        serializer.save(gimnasio=gimnasio)
+
+    @action(detail=True, methods=['post'])
+    def unirse(self, request, pk=None):
+        """El cliente se une a un reto (si ya está unido, devuelve su participación)."""
+        reto = self.get_object()
+        cliente = getattr(request.user, 'cliente_perfil', None)
+        if not cliente:
+            raise PermissionDenied('No tienes un perfil de cliente asociado.')
+        if reto.estado != 'ACTIVO':
+            return Response(
+                {'detail': 'Este reto no está activo; no se puede unir.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # get_or_create no es a prueba de condición de carrera por sí solo pese al
+        # unique_together de ParticipacionReto: envolverlo en atomic() y capturar
+        # IntegrityError es el patrón que la propia documentación de Django
+        # recomienda para este caso (dos clics/reintentos casi simultáneos).
+        try:
+            with transaction.atomic():
+                participacion = ParticipacionReto.objects.create(reto=reto, cliente=cliente)
+        except IntegrityError:
+            participacion = ParticipacionReto.objects.get(reto=reto, cliente=cliente)
+
+        serializer = ParticipacionRetoSerializer(participacion)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['post'], url_path='actualizar-progreso')
+    def actualizar_progreso(self, request, pk=None):
+        """El cliente suma progreso a su participación en el reto."""
+        reto = self.get_object()
+        cliente = getattr(request.user, 'cliente_perfil', None)
+        if not cliente:
+            raise PermissionDenied('No tienes un perfil de cliente asociado.')
+        if reto.estado != 'ACTIVO':
+            return Response(
+                {'detail': 'Este reto no está activo; no se puede sumar progreso.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            incremento = int(request.data.get('incremento', 0))
+        except (TypeError, ValueError):
+            return Response({'detail': 'incremento debe ser un número.'}, status=status.HTTP_400_BAD_REQUEST)
+        if incremento <= 0:
+            return Response({'detail': 'incremento debe ser mayor a 0.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # select_for_update() dentro de atomic() serializa dos sumas concurrentes
+        # de la misma participación (ej. doble clic): la segunda espera a que la
+        # primera confirme, así que ambos incrementos se aplican sobre el valor
+        # ya actualizado en vez de perderse uno.
+        with transaction.atomic():
+            try:
+                participacion = ParticipacionReto.objects.select_for_update().get(
+                    reto=reto, cliente=cliente
+                )
+            except ParticipacionReto.DoesNotExist:
+                return Response(
+                    {'detail': 'Primero debes unirte a este reto.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            participacion.progreso_actual = min(participacion.progreso_actual + incremento, reto.meta)
+            if not participacion.completado and participacion.progreso_actual >= reto.meta:
+                participacion.completado = True
+                participacion.fecha_completado = timezone.now()
+            participacion.save()
+
+        revisar_completar_reto(participacion)
+
+        serializer = ParticipacionRetoSerializer(participacion)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class MisLogrosAPIView(APIView):
+    """El cliente logueado ve sus propios logros obtenidos."""
+    permission_classes = [IsCliente]
+
+    def get(self, request):
+        cliente = getattr(request.user, 'cliente_perfil', None)
+        if not cliente:
+            return Response([])
+        logros = LogroObtenido.objects.filter(cliente=cliente)
+        serializer = LogroObtenidoSerializer(logros, many=True)
+        return Response(serializer.data)
+
+
+class FeedAPIView(APIView):
+    """Feed comunitario del gimnasio: logros de todos los clientes, si está habilitado."""
+    permission_classes = [IsCliente]
+
+    def get(self, request):
+        gimnasio = _get_user_gimnasio(request.user)
+        if not gimnasio or not gimnasio.feed_habilitado:
+            return Response({'habilitado': False, 'logros': []})
+
+        logros = LogroObtenido.objects.filter(cliente__gimnasio=gimnasio).select_related('cliente')[:50]
+        serializer = LogroObtenidoSerializer(logros, many=True)
+        return Response({'habilitado': True, 'logros': serializer.data})
+
+
+class TablaLideresAPIView(APIView):
+    """Ranking de clientes del gimnasio por cantidad total de logros obtenidos.
+
+    Usa el mismo interruptor que el feed (Gimnasio.feed_habilitado): es parte
+    de las funciones sociales que el ADMIN puede apagar desde Configuración.
+    """
+    permission_classes = [IsCliente]
+    TOP_N = 10
+
+    def get(self, request):
+        gimnasio = _get_user_gimnasio(request.user)
+        if not gimnasio or not gimnasio.feed_habilitado:
+            return Response({'habilitado': False, 'ranking': []})
+
+        mi_cliente = getattr(request.user, 'cliente_perfil', None)
+
+        top = (
+            Cliente.objects.filter(gimnasio=gimnasio)
+            .annotate(total_logros=Count('logros'))
+            .filter(total_logros__gt=0)
+            .order_by('-total_logros', 'nombre', 'apellido')[:self.TOP_N]
+        )
+        ranking = [
+            {
+                'cliente_id': c.id,
+                'nombre': c.nombre,
+                'apellido': c.apellido,
+                'total_logros': c.total_logros,
+                'soy_yo': mi_cliente is not None and c.id == mi_cliente.id,
+            }
+            for c in top
+        ]
+        return Response({'habilitado': True, 'ranking': ranking})
 
 
 class MisReservasAPIView(APIView):

@@ -1,4 +1,4 @@
-import { CalendarDays, ClipboardList, CreditCard, LogOut } from 'lucide-react';
+import { CalendarDays, ClipboardList, CreditCard, ListChecks, LogOut, Trophy, TrendingUp } from 'lucide-react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import Logo from './Logo';
 import { logout } from '../api/client';
@@ -6,6 +6,9 @@ import { logout } from '../api/client';
 const navItems = [
   { to: '/cliente/clases', label: 'Clases Disponibles', icon: CalendarDays },
   { to: '/cliente/reservas', label: 'Mis Reservas', icon: ClipboardList },
+  { to: '/cliente/rutinas', label: 'Rutinas', icon: ListChecks },
+  { to: '/cliente/progreso', label: 'Mi Progreso', icon: TrendingUp },
+  { to: '/cliente/comunidad', label: 'Comunidad', icon: Trophy },
   { to: '/cliente/membresia', label: 'Mi Membresía', icon: CreditCard },
 ];
 
@@ -19,7 +22,7 @@ export default function ClienteSidebar() {
 
   return (
     <aside
-      className="fixed left-0 top-0 h-full bg-navy w-[168px] flex flex-col py-8 px-3 z-50"
+      className="hidden md:flex fixed left-0 top-0 h-full bg-navy w-[168px] flex-col py-8 px-3 z-50"
       style={{ fontFamily: "'Inter', sans-serif" }}
     >
       <div className="mb-10 flex justify-center">
