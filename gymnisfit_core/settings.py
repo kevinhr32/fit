@@ -184,6 +184,11 @@ CORS_ALLOWED_ORIGINS = [
     'http://127.0.0.1:5174',
 ] + env.list('CORS_ALLOWED_ORIGINS', default=[])
 
+# En produccion: dominios (con esquema https://) que pueden enviar POST al
+# login legacy de Django y al admin. La SPA usa JWT y no necesita CSRF, pero
+# /login/ y /admin/ si. Railway expone el dominio del servicio en RAILWAY_PUBLIC_DOMAIN.
+CSRF_TRUSTED_ORIGINS = env.list('CSRF_TRUSTED_ORIGINS', default=[])
+
 LOGIN_URL = '/login/'
 LOGIN_REDIRECT_URL = '/dashboard/'
 
